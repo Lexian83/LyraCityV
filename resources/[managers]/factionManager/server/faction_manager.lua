@@ -3,10 +3,15 @@
 local FactionCache = {}
 local RankCache = {}        -- [faction_id] = { [rank_id] = row, byLevel = { [level] = row } }
 local MemberCache = {}      -- optional: für schnelle Lookups; hier minimal genutzt
-local DutyState = {}  -- [charId] = { [factionId] = true }
+local DutyState = {}        -- [charId] = { [factionId] = true }
 
 local FactionPermissionSchema = {}
 
+----------------------------------------------------------
+-- UNIVERSAL MEMBER FETCHER
+-- Liefert Fraktions-Mitglied + Rang + Meta auf Basis charId.
+-- Optional kann eine Fraktion gefiltert werden (ID oder Name).
+----------------------------------------------------------
 
 ---@param charId number          -- Charakter-ID aus der Tabelle `characters`
 ---@param factionFilter any      -- optional: faction_id (number) oder faction name (string)
@@ -59,7 +64,6 @@ function _getMemberWithRank(charId, factionFilter)
     baseQuery = baseQuery .. " ORDER BY r.level DESC LIMIT 1"
 
     local row = MySQL.single.await(baseQuery, params)
-
     if not row then
         return nil
     end
@@ -82,6 +86,9 @@ function _getMemberWithRank(charId, factionFilter)
     }
 end
 
+----------------------------------------------------------
+-- PERMISSION-SCHEMA
+----------------------------------------------------------
 
 local function buildDefaultPermissionSchema()
     return {
@@ -153,8 +160,9 @@ RegisterCommand('faction_perms_reload', function(src)
     print('[factionManager] Permission-Schema neu geladen.')
 end, true)
 
-
-
+----------------------------------------------------------
+-- HELPER
+----------------------------------------------------------
 
 local function debug(msg)
     -- print(('[FactionManager] %s'):format(msg))
@@ -187,9 +195,9 @@ local function GetCharIdFromSource(srcOrChar)
     return srcOrChar
 end
 
-
-
--- ########## LOADERS ##########
+----------------------------------------------------------
+-- LOADERS
+----------------------------------------------------------
 
 local function LoadFaction(id)
     local rows = MySQL.query.await('SELECT * FROM factions WHERE id = ?', { id })
@@ -274,7 +282,10 @@ local function EnsureFactionRanks(factionId)
     end
 end
 
--- ########## EXPORTS: FETCH ##########
+----------------------------------------------------------
+-- EXPORTS: FETCH
+----------------------------------------------------------
+
 -- Holt alle Fraktionen (mit optionalem Suchstring), inkl. Leader-Name & Member-Anzahl
 function GetAllFactions(search)
     local sql = [[
@@ -441,6 +452,10 @@ function GetFactionLogs(factionId, limit)
 end
 exports('GetFactionLogs', GetFactionLogs)
 
+----------------------------------------------------------
+-- DUTY
+----------------------------------------------------------
+
 local function _setDuty(charId, factionId, state)
     charId = tonumber(charId)
     factionId = tonumber(factionId)
@@ -519,10 +534,12 @@ function IsOnDuty(srcOrChar, factionIdOrName)
 end
 exports('IsOnDuty', IsOnDuty)
 
+----------------------------------------------------------
+-- PERMISSIONS (bereinigt)
+----------------------------------------------------------
 
--- ########## PERMISSIONS ##########
-
-local function _getMemberWithRank(charId, factionId)
+-- Schlanker Helper nur für Permissions, damit wir logisch getrennt bleiben.
+local function _fetchMemberRankSimple(charId, factionId)
     local rows = MySQL.query.await([[
         SELECT fm.*, fr.level, fr.permissions
         FROM faction_members fm
@@ -540,6 +557,7 @@ local function _getMemberWithRank(charId, factionId)
     elseif type(row.permissions) ~= 'table' then
         row.permissions = {}
     end
+
     return row
 end
 
@@ -557,7 +575,7 @@ function HasFactionPermission(srcOrChar, factionIdOrName, permKey)
     end
     if not faction then return false end
 
-    local member = _getMemberWithRank(charId, faction.id)
+    local member = _fetchMemberRankSimple(charId, faction.id)
     if not member then return false end
 
     -- Duty-Pflicht: wenn gesetzt & nicht on duty -> keine Rechte (außer evtl. ganz oben)
@@ -597,7 +615,7 @@ function IsFactionLeader(srcOrChar, factionIdOrName, minLevel)
     end
     if not faction then return false end
 
-    local member = _getMemberWithRank(charId, faction.id)
+    local member = _fetchMemberRankSimple(charId, faction.id)
     if not member then return false end
 
     return (tonumber(member.level) or 0) >= minLevel
@@ -656,10 +674,9 @@ function HasAnyFactionPermission(srcOrChar, permKey, minLevel)
 end
 exports('HasAnyFactionPermission', HasAnyFactionPermission)
 
-
-
-
--- ########## LOGGING ##########
+----------------------------------------------------------
+-- LOGGING
+----------------------------------------------------------
 
 function LogFactionAction(factionId, actorCharId, targetCharId, action, details)
     factionId = tonumber(factionId)
@@ -683,7 +700,10 @@ function LogFactionAction(factionId, actorCharId, targetCharId, action, details)
 end
 exports('LogFactionAction', LogFactionAction)
 
--- ########## EXPORTS: MUTATIONEN ##########
+----------------------------------------------------------
+-- EXPORTS: MUTATIONEN
+----------------------------------------------------------
+
 -- Update von Stammdaten einer Fraktion (zentrale Stelle)
 function UpdateFaction(factionId, data)
     factionId = tonumber(factionId)
