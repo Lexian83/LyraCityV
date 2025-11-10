@@ -13,15 +13,19 @@ files {
     'ui/assets/*.webp'
 }
 
+client_scripts {
+    'client.lua'
+}
+
 shared_scripts {
     '@ox_lib/init.lua'
 }
 
 server_scripts {
-    '@oxmysql/lib/MySQL.lua',
-    'server.lua'
+    '@SQL/server/_bootstrap.lua',
+    '@SQL/server/characters.lua',
+    'server.lua',
 }
 
-client_scripts {
-    'client.lua'
-}
+dependency 'playerManager'
+

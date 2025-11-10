@@ -1,50 +1,29 @@
--- LCV Character Select - Server Side (ACE-free, type-safe)
+-- LCV Character Select - Server Side
+-- Jetzt verdrahtet mit playerManager / SQL Characters
 
 local MAX_CHARACTERS = 6
 
 local function slog(level, msg)
     level = level or "info"
     if LCV and LCV.Util and LCV.Util.log then
-        return LCV.Util.log(level, msg)
+        return LCV.Util.log(level, ('[LCV-CharSelect] %s'):format(tostring(msg)))
     else
         print(("[LCV-CharSelect][%s] %s"):format(level:upper(), tostring(msg)))
     end
 end
 
-local function getDiscordId(src)
-    src = tonumber(src)
-    if not src then return nil end
-
-    for _, id in ipairs(GetPlayerIdentifiers(src)) do
-        if id:sub(1, 8) == "discord:" then
-            return id:sub(9)
-        end
-    end
-end
-
--- Charaktere für Account laden
-local function loadCharactersForAccount(src, accountId, accountNewFlag, cb)
-    if not accountId then
+-- Lädt alle Charaktere eines Accounts aus LCV.Characters
+local function loadCharactersForAccount(accountId, cb)
+    if not (LCV and LCV.Characters and LCV.Characters.listByAccount) then
+        slog("error", "LCV.Characters.listByAccount nicht verfügbar (SQL-Resource geladen?)")
         return cb({
             canCreate     = false,
             maxCharacters = MAX_CHARACTERS,
             characters    = {}
-        }, nil)
+        })
     end
 
-    MySQL.query([[
-        SELECT
-            id,
-            account_id,
-            name,
-            gender,
-            DATE_FORMAT(birthdate, '%d.%m.%Y') AS birthdate,
-            type,
-            is_locked
-        FROM characters
-        WHERE account_id = ?
-        ORDER BY id ASC
-    ]], { accountId }, function(rows)
+    LCV.Characters.listByAccount(accountId, function(rows)
         rows = rows or {}
         local characters = {}
 
@@ -54,13 +33,13 @@ local function loadCharactersForAccount(src, accountId, accountNewFlag, cb)
                 accountid = r.account_id,
                 name      = r.name or ("Char #" .. r.id),
                 gender    = r.gender,
-                birthdate = r.birthdate,
+                birthdate = r.birthdate, -- falls vorhanden im Select
                 type      = r.type or 0,
                 is_locked = (r.is_locked == 1)
             }
         end
 
-        local canCreate = (tonumber(accountNewFlag) == 1)
+        local canCreate = true
         if #characters >= MAX_CHARACTERS then
             canCreate = false
         end
@@ -69,12 +48,11 @@ local function loadCharactersForAccount(src, accountId, accountNewFlag, cb)
             canCreate     = canCreate,
             maxCharacters = MAX_CHARACTERS,
             characters    = characters
-        }, accountId)
+        })
     end)
 end
 
--- Account + Characters anhand accountId oder Discord finden
--- cb(payload, resolvedAccountId)
+-- Baut Payload auf Basis accountId oder über playerManager
 local function buildPayload(src, rawAccountId, cb)
     src = tonumber(src)
     if not src or src <= 0 then
@@ -85,52 +63,20 @@ local function buildPayload(src, rawAccountId, cb)
         }, nil)
     end
 
-    -- 1) numeric accountId übergeben?
-    local numericId = tonumber(rawAccountId)
-    if numericId then
-        MySQL.single(
-            "SELECT CAST(`new` AS UNSIGNED) AS new FROM accounts WHERE id = ? LIMIT 1",
-            { numericId },
-            function(acc)
-                if acc then
-                    return loadCharactersForAccount(src, numericId, acc.new, cb)
-                end
+    local accountId = tonumber(rawAccountId)
 
-                -- Fallback über Discord
-                local discordId = getDiscordId(src)
-                if not discordId then
-                    slog("warn", ("buildPayload: no account for id=%s / no discord for %s")
-                        :format(tostring(rawAccountId), tostring(src)))
-                    return cb({
-                        canCreate     = false,
-                        maxCharacters = MAX_CHARACTERS,
-                        characters    = {}
-                    }, nil)
-                end
-
-                MySQL.single(
-                    "SELECT id, CAST(`new` AS UNSIGNED) AS new FROM accounts WHERE discord_id = ? LIMIT 1",
-                    { discordId },
-                    function(acc2)
-                        if not acc2 then
-                            return cb({
-                                canCreate     = true,
-                                maxCharacters = MAX_CHARACTERS,
-                                characters    = {}
-                            }, nil)
-                        end
-                        loadCharactersForAccount(src, acc2.id, acc2.new, cb)
-                    end
-                )
-            end
-        )
-        return
+    -- Wenn keine accountId mitgegeben: über playerManager holen
+    if not accountId and GetResourceState('playerManager') == 'started' then
+        local ok, acc = pcall(function()
+            return exports['playerManager']:GetAccountId(src)
+        end)
+        if ok and acc then
+            accountId = tonumber(acc)
+        end
     end
 
-    -- 2) Kein numeric accountId -> über Discord
-    local discordId = getDiscordId(src)
-    if not discordId then
-        slog("warn", ("buildPayload: no valid accountId and no discord for %s"):format(tostring(src)))
+    if not accountId then
+        slog("warn", ("buildPayload: kein accountId für src=%s"):format(src))
         return cb({
             canCreate     = false,
             maxCharacters = MAX_CHARACTERS,
@@ -138,29 +84,21 @@ local function buildPayload(src, rawAccountId, cb)
         }, nil)
     end
 
-    MySQL.single(
-        "SELECT id, CAST(`new` AS UNSIGNED) AS new FROM accounts WHERE discord_id = ? LIMIT 1",
-        { discordId },
-        function(acc)
-            if not acc then
-                return cb({
-                    canCreate     = true,
-                    maxCharacters = MAX_CHARACTERS,
-                    characters    = {}
-                }, nil)
-            end
-
-            loadCharactersForAccount(src, acc.id, acc.new, cb)
-        end
-    )
+    loadCharactersForAccount(accountId, function(payload)
+        cb(payload, accountId)
+    end)
 end
 
--- Charselect öffnen (vom Auth oder Editor)
-RegisterNetEvent("LCV:charselect:load", function(targetSrc, accountId)
+-- =========================
+-- Charselect öffnen (von auth)
+-- =========================
+-- auth ruft:
+--   TriggerEvent('LCV:charselect:load', src, accountId)
+AddEventHandler("LCV:charselect:load", function(targetSrc, accountId)
     local eventSource = source
     local src = tonumber(eventSource) or 0
 
-    -- Wenn von Server intern (TriggerEvent) aufgerufen: targetSrc enthält Spieler-ID
+    -- Wenn intern vom Server (TriggerEvent) → targetSrc ist der Spieler
     if src == 0 and targetSrc ~= nil then
         local t = tonumber(targetSrc)
         if t and t > 0 then
@@ -179,10 +117,6 @@ RegisterNetEvent("LCV:charselect:load", function(targetSrc, accountId)
 
         TriggerClientEvent("LCV:charselect:show", src, payload, resolvedAccountId)
 
-        if resolvedAccountId then
-            SetPlayerRoutingBucket(src, resolvedAccountId)
-        end
-
         slog("info", ("CharSelect opened for %s (acc=%s chars=%d canCreate=%s)")
             :format(
                 GetPlayerName(src) or src,
@@ -193,7 +127,9 @@ RegisterNetEvent("LCV:charselect:load", function(targetSrc, accountId)
     end)
 end)
 
+-- =========================
 -- Reload aus Client (optional)
+-- =========================
 RegisterNetEvent("LCV:charselect:reload", function()
     local src = tonumber(source) or 0
     if src <= 0 then
@@ -213,7 +149,9 @@ RegisterNetEvent("LCV:charselect:reload", function()
     end)
 end)
 
--- NUI schließen
+-- =========================
+-- NUI schließen (Server-seitig)
+-- =========================
 RegisterNetEvent("LCV:charselect:close", function()
     local src = tonumber(source) or 0
     if src > 0 then
@@ -221,7 +159,9 @@ RegisterNetEvent("LCV:charselect:close", function()
     end
 end)
 
--- Charakter auswählen
+-- =========================
+-- Charakter auswählen (HOOK → playerManager)
+-- =========================
 RegisterNetEvent("LCV:charselect:select", function(charId)
     local src = tonumber(source) or 0
     if src <= 0 then return end
@@ -235,37 +175,31 @@ RegisterNetEvent("LCV:charselect:select", function(charId)
         return
     end
 
-    MySQL.single([[
-        SELECT id, account_id, is_locked
-        FROM characters
-        WHERE id = ?
-        LIMIT 1
-    ]], { id }, function(row)
-        if not row then
-            TriggerClientEvent("ox_lib:notify", src, {
-                type = "error",
-                description = "Ungültiger Charakter."
-            })
-            return
-        end
+    -- UI zu
+    TriggerClientEvent("LCV:charselect:close", src)
 
-        if row.is_locked == 1 then
-            TriggerClientEvent("ox_lib:notify", src, {
-                type = "error",
-                description = "Dieser Charakter ist gesperrt."
-            })
-            return
-        end
+    -- Übergabe an PlayerManager:
+    -- dieser prüft Ownership, lädt Full Data und triggert LCV:spawn
+    TriggerEvent("LCV:Player:SelectCharacter", src, id)
 
-        TriggerClientEvent("LCV:charselect:close", src)
-
-        -- hier hängst du dein Spawn-System dran
-        TriggerEvent("LCV:charselect:spawn", src, row.id)
-
-        slog("info", ("Selected char %d for %s")
-            :format(id, GetPlayerName(src) or src))
-    end)
+    slog("info", ("Selected char %d for %s (weiter an PlayerManager)")
+        :format(id, GetPlayerName(src) or src))
 end)
+
+-- =========================
+-- Platzhalter für Delete/Rename Hooks
+-- (UI kann später direkt PlayerManager Events nutzen)
+-- =========================
+-- Beispiel:
+-- RegisterNetEvent("LCV:charselect:delete", function(charId)
+--     local src = source
+--     TriggerEvent("LCV:Player:DeleteCharacter", src, tonumber(charId))
+-- end)
+--
+-- RegisterNetEvent("LCV:charselect:rename", function(charId, newName)
+--     local src = source
+--     TriggerEvent("LCV:Player:RenameCharacter", src, tonumber(charId), newName)
+-- end)
 
 AddEventHandler("playerDropped", function()
     -- optional: cleanup / bucket reset etc.

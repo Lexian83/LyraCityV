@@ -1,91 +1,108 @@
 local showing = false
 local accountid = 0
 
--- Public event to open with payload
-RegisterNetEvent('LCV:charselect:show', function(payload,account_id)
-	exports.inputmanager:LCV_OpenUI('charselect')
-    SendNUIMessage({ action = 'setData', payload = payload })
-    SetNuiFocus(true, true)
-    SendNUIMessage({ action = 'open' })
+-- Öffnet die Charselect-UI mit Payload vom Server
+RegisterNetEvent('LCV:charselect:show', function(payload, account_id)
+    accountid = account_id or 0
     showing = true
-    -- print('Open Charselector')
-        -- WICHTIG: Loading-Screen wirklich schließen
+
+    -- Dein Input-Manager / NUI öffnen
+    exports.inputmanager:LCV_OpenUI('charselect')
+
+    SendNUIMessage({ action = 'setData', payload = payload })
+    SendNUIMessage({ action = 'open' })
+
+    SetNuiFocus(true, true)
+
+    -- Loading-Screen schließen
     ShutdownLoadingScreen()
     ShutdownLoadingScreenNui()
     DoScreenFadeIn(500)
-	accountid = account_id
 end)
 
+-- Schließt die Charselect-UI
 RegisterNetEvent('LCV:charselect:close', function()
-	exports.inputmanager:LCV_CloseUI('charselect')
-       -- NUI zu
+    showing = false
+
+    exports.inputmanager:LCV_CloseUI('charselect')
+
     SendNUIMessage({ action = 'close' })
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
     SetPauseMenuActive(false)
-    showing = false
 
-    -- Spieler wieder freigeben
     local ped = PlayerPedId()
     FreezeEntityPosition(ped, false)
-    
-    -- print('CHAR SELECTOR CLOSE EVENT')
 end)
 
--- ESC to close
+-- ESC / Controls während Charselect blocken
 CreateThread(function()
     while true do
         if showing then
-            DisableControlAction(0, 1, true)  -- LookLeftRight
-            DisableControlAction(0, 2, true)  -- LookUpDown
+            DisableControlAction(0, 1, true)   -- LookLeftRight
+            DisableControlAction(0, 2, true)   -- LookUpDown
             DisableControlAction(0, 142, true) -- Melee
-            DisableControlAction(0, 18, true) -- Enter
+            DisableControlAction(0, 18, true)  -- Enter
         end
         Wait(0)
     end
 end)
 
--- NUI Callbacks
+-- ========== NUI Callbacks ==========
+
+-- Neuer Charakter -> dein Editor
 RegisterNUICallback('createCharacter', function(_, cb)
-    -- TriggerEvent('LCV:charselect:create')
-    -- TriggerServerEvent('LCV:charselect:create')
+    -- UI schließen
     TriggerEvent('LCV:charselect:close')
-    -- print('CHAR SELECTOR CLOSE TRIGGER')
-    -- TriggerEvent('LCV:editor:open')
-	TriggerServerEvent('character:Edit',_,accountid)
-    -- print('Open Char Editor')
+
+    -- Öffnet deinen Character-Editor (bestehendes System)
+    -- Der Editor sollte am Ende 'LCV:Player:CreateCharacter' triggern.
+    TriggerServerEvent('character:Edit', _, accountid)
+
     cb({ ok = true })
 end)
 
+-- Charakter auswählen -> PlayerManager
 RegisterNUICallback('selectCharacter', function(data, cb)
-     TriggerEvent('LCV:charselect:close')
-    TriggerServerEvent('LCV:selectCharacterX', data.id)
-     -- print('CHAR SELECTOR Select TRIGGER: ', data.id)
+    if not data or not data.id then
+        cb({ ok = false, error = "no id" })
+        return
+    end
+
+    -- UI schließen
+    TriggerEvent('LCV:charselect:close')
+
+    -- An Charselect-Server, der es an PlayerManager weitergibt
+    TriggerServerEvent('LCV:charselect:select', data.id)
+
     cb({ ok = true })
 end)
 
+-- UI per Close-Button schließen
 RegisterNUICallback('close', function(_, cb)
-    SetNuiFocus(false, false)
     showing = false
+    SetNuiFocus(false, false)
+    SetNuiFocusKeepInput(false)
+    SetPauseMenuActive(false)
+
     TriggerEvent('LCV:charselect:closed')
     cb({ ok = true })
 end)
--- Eventhandler
+
+-- ========== Initialer Trigger nach Join ==========
+-- Lädt Charselect nach dem ersten Spawn vom Server (auth → charselect:load)
 
 CreateThread(function()
-    -- Warte bis Network & Ped stehen
     while not NetworkIsPlayerActive(PlayerId()) do Wait(50) end
     while not DoesEntityExist(PlayerPedId()) do Wait(50) end
-    -- Optional: warten bis nicht tot/ohne Kollision usw.
     while IsEntityDead(PlayerPedId()) do Wait(50) end
-    -- kleine Gnadenfrist, bis Streaming/Kollision sicher ist
     Wait(200)
-       local ped = GetPlayerPed(-1)    -- get local ped
-        FreezeEntityPosition(ped, true)   -- freeze player
 
-        -- trigger your event here / or whatever you need to load the map / Citizen.Wait instruction etc
-        TriggerServerEvent('LCV:playerSpawned')
-        LoadAllObjectsNow()
-        -- print('Player Spawned!')
+    local ped = PlayerPedId()
+    FreezeEntityPosition(ped, true)
+
+    -- Triggert auf dem Server:
+    -- auth → LCV:playerSpawned → LCV:charselect:load → LCV:charselect:show
+    TriggerServerEvent('LCV:playerSpawned')
+    LoadAllObjectsNow()
 end)
-

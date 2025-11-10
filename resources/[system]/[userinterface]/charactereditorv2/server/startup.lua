@@ -1,4 +1,10 @@
 -- LCV Character Editor - Server
+-- Integriert in LCV.Characters + playerManager + charselect
+
+local function log(level, msg)
+    level = level or "INFO"
+    print(("[CharacterEditor][%s] %s"):format(level, tostring(msg)))
+end
 
 -- Hilfsfunktion: sicheres JSON-Decode
 local function decodeMaybeJSON(data)
@@ -10,7 +16,7 @@ local function decodeMaybeJSON(data)
         if ok and parsed ~= nil then
             return parsed
         else
-            print('[Character Editor] Failed to decode JSON.')
+            log("WARN", "Failed to decode JSON.")
             return nil
         end
     end
@@ -19,6 +25,8 @@ local function decodeMaybeJSON(data)
 end
 
 -- Öffnet den Editor mit optionalen bestehenden Daten
+-- Wird z.B. von charselect/client.lua via:
+--   TriggerServerEvent('character:Edit', oldData, accountId)
 RegisterNetEvent('character:Edit', function(oldData, accId)
     local src = source
 
@@ -31,36 +39,53 @@ RegisterNetEvent('character:Edit', function(oldData, accId)
     TriggerClientEvent('character:Edit', src, oldData, accId)
 end)
 
--- Charakter wurde im Editor abgeschlossen -> speichern & zurück ins Charselect
-RegisterNetEvent('character:Done', function(data, account_id)
+-- Charakter speichern (NEUER CHAR) -> nutzt LCV.Characters.create
+-- NUI -> client/editor.lua -> TriggerServerEvent('character:Done', data, accountid)
+RegisterNetEvent('character:Done', function(payload, account_id)
     local src = source
 
+    payload = decodeMaybeJSON(payload) or payload
+
     if not account_id then
-        print(('[Character Editor] character:Done ohne account_id von %s'):format(src))
+        log("ERROR", ("character:Done ohne account_id von %s"):format(src))
+        -- Zurück ins Charselect, falls möglich
+        TriggerEvent('LCV:charselect:load', src, nil)
         return
     end
 
-    -- Data ggf. decoden
-    data = decodeMaybeJSON(data) or data
-
-    if type(data) ~= 'table'
-        or not data.data
-        or not data.identity
-        or not data.clothes
-    then
-        print('[Character Editor] Invalid data in character:Done (missing blocks).')
+    if type(payload) ~= 'table' then
+        log("WARN", "character:Done ohne gültigen Payload -> zurück ins Charselect.")
+        TriggerEvent('LCV:charselect:load', src, account_id)
         return
     end
 
-    local d = data.data
-    local i = data.identity
-    local c = data.clothes
+    -- Erwartete Struktur aus app.js:
+    -- {
+    --   data = { ... Appearance ... },
+    --   clothes = { ... },
+    --   identity = { fname, sname, birthdate, country, past }
+    -- }
+    if not payload.data or not payload.identity or not payload.clothes then
+        -- Das behandeln wir als "Abbruch" / unvollständig -> zurück ins Charselect
+        log("WARN", "character:Done ohne vollständige Blocks -> zurück ins Charselect.")
+        TriggerEvent('LCV:charselect:load', src, account_id)
+        return
+    end
 
-    -- Fallbacks, damit der Insert nie an NULL/NOT NULL crasht
-    local accID     = tonumber(account_id)
-    local fname     = i.fname or ''
-    local sname     = i.sname or ''
-    local fullName  = (sname ~= '' or fname ~= '')
+    local d = payload.data
+    local i = payload.identity
+    local c = payload.clothes
+
+    local accID = tonumber(account_id)
+    if not accID then
+        log("ERROR", "character:Done mit ungültiger account_id.")
+        TriggerEvent('LCV:charselect:load', src, account_id)
+        return
+    end
+
+    local fname    = i.fname or ''
+    local sname    = i.sname or ''
+    local fullName = (sname ~= '' or fname ~= '')
         and (('%s,%s'):format(sname, fname))
         or 'Unbekannt,Unbekannt'
 
@@ -69,93 +94,154 @@ RegisterNetEvent('character:Done', function(data, account_id)
     local country   = i.country or ''
     local past      = i.past or 0
 
-    local params = {
-        accID      = accID,
-        name       = fullName,
-        gender     = gender,
-        country    = country,
-        birthdate  = birthdate,
-        created    = os.date('%Y-%m-%d %H:%M:%S'),
-        appearance = json.encode(d),
-        clothes    = json.encode(c),
-        past       = past,
+    -- Datenobjekt passend zu LCV.Characters.create
+    local newChar = {
+        name             = fullName,
+        gender           = gender,
+        heritage_country = country,
+        birthdate        = birthdate,
+        past             = past,
+        residence_permit = 0,
+        health           = 200,
+        thirst           = 200,
+        food             = 200,
+        pos              = { x = 0, y = 0, z = 0 },
+        heading          = 0,
+        dimension        = 0,
+        appearance       = d,
+        clothes          = c,
     }
 
-    local query = [[
-        INSERT INTO characters (
-            account_id,
-            name,
-            gender,
-            heritage_country,
-            health,
-            thirst,
-            food,
-            pos_x,
-            pos_y,
-            pos_z,
-            heading,
-            dimension,
-            created_at,
-            level,
-            birthdate,
-            type,
-            is_locked,
-            appearance,
-            clothes,
-            residence_permit,
-            past
-        ) VALUES (
-            :accID,
-            :name,
-            :gender,
-            :country,
-            200,
-            200,
-            200,
-            0,
-            0,
-            0,
-            0,
-            0,
-            :created,
-            0,
-            :birthdate,
-            0,
-            0,
-            :appearance,
-            :clothes,
-            0,
-            :past
-        )
-    ]]
+    -- Bevorzugt: unser SQL-Wrapper
+    if LCV and LCV.Characters and LCV.Characters.create then
+        LCV.Characters.create(accID, newChar, function(id)
+            if not id then
+                log("ERROR", ("Charakter konnte nicht gespeichert werden (Account %s)."):format(accID))
+                TriggerClientEvent('ox_lib:notify', src, {
+                    type = 'error',
+                    description = 'Charakter konnte nicht gespeichert werden.',
+                })
+                TriggerEvent('LCV:charselect:load', src, accID)
+                return
+            end
 
-    exports.oxmysql:insert(query, params, function(id)
-        if not id then
-            print(('[LyraCityV][Character Editor] FEHLER: Charakter konnte nicht gespeichert werden (Account %s).')
-                :format(tostring(accID)))
-            TriggerClientEvent('ox_lib:notify', src, {
-                type = 'error',
-                description = 'Charakter konnte nicht gespeichert werden.',
-            })
-            return
-        end
+            log("INFO", ("Charakter gespeichert via LCV.Characters.create. ID=%s, Account=%s, Name=%s")
+                :format(id, accID, newChar.name))
 
-        print(('[LyraCityV][Character Editor] Charakter gespeichert. ID=%s, Account=%s, Name=%s')
-            :format(id, tostring(accID), params.name))
+            -- Optional: "new"-Flag entfernen (kompatibel zu deinem alten System)
+            if LCV.DB and LCV.DB.update then
+                LCV.DB.update('UPDATE accounts SET new = 0 WHERE id = ?', { accID }, function() end)
+            elseif exports.oxmysql then
+                exports.oxmysql:update('UPDATE accounts SET new = 0 WHERE id = ?', { accID })
+            end
 
-        -- Optional: Account als "nicht mehr neu" markieren
-        if accID then
-            exports.oxmysql:update('UPDATE accounts SET new = 0 WHERE id = ?', { accID })
-        end
+            -- Erfolg an Client (falls genutzt)
+            TriggerClientEvent('character:SaveSuccess', src, id)
 
-        -- Erfolg zurück an Client (falls du das im UI nutzt)
-        TriggerClientEvent('character:SaveSuccess', src, id)
+            -- Zurück in die Char-Auswahl
+            TriggerEvent('LCV:charselect:load', src, accID)
+        end)
+        return
+    end
 
-        -- Direkt zurück ins Char-Select:
-        -- Wichtig: Das ist ein SERVER-Event, das in deiner Charselect-Resource
-        -- den Payload baut und dann das UI beim Spieler öffnet.
+    -- Fallback: direkt via oxmysql (falls LCV.Characters noch nicht aktiv)
+    if exports.oxmysql then
+        local params = {
+            accID      = accID,
+            name       = newChar.name,
+            gender     = newChar.gender,
+            country    = newChar.heritage_country,
+            birthdate  = newChar.birthdate,
+            created    = os.date('%Y-%m-%d %H:%M:%S'),
+            appearance = json.encode(newChar.appearance),
+            clothes    = json.encode(newChar.clothes),
+            past       = newChar.past,
+        }
+
+        local query = [[
+            INSERT INTO characters (
+                account_id,
+                name,
+                gender,
+                heritage_country,
+                health,
+                thirst,
+                food,
+                pos_x,
+                pos_y,
+                pos_z,
+                heading,
+                dimension,
+                created_at,
+                level,
+                birthdate,
+                type,
+                is_locked,
+                appearance,
+                clothes,
+                residence_permit,
+                past
+            ) VALUES (
+                :accID,
+                :name,
+                :gender,
+                :country,
+                200,
+                200,
+                200,
+                0,
+                0,
+                0,
+                0,
+                0,
+                :created,
+                0,
+                :birthdate,
+                0,
+                0,
+                :appearance,
+                :clothes,
+                0,
+                :past
+            )
+        ]]
+
+        exports.oxmysql:insert(query, params, function(id)
+            if not id then
+                log("ERROR", ("[Fallback] Charakter konnte nicht gespeichert werden (Account %s)."):format(accID))
+                TriggerClientEvent('ox_lib:notify', src, {
+                    type = 'error',
+                    description = 'Charakter konnte nicht gespeichert werden.',
+                })
+                TriggerEvent('LCV:charselect:load', src, accID)
+                return
+            end
+
+            log("INFO", ("[Fallback] Charakter gespeichert. ID=%s, Account=%s, Name=%s")
+                :format(id, accID, newChar.name))
+
+            if accID then
+                exports.oxmysql:update('UPDATE accounts SET new = 0 WHERE id = ?', { accID })
+            end
+
+            TriggerClientEvent('character:SaveSuccess', src, id)
+            TriggerEvent('LCV:charselect:load', src, accID)
+        end)
+    else
+        log("ERROR", "Weder LCV.Characters.create noch oxmysql verfügbar. Charakter nicht gespeichert.")
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'error',
+            description = 'Serverfehler beim Speichern des Charakters.',
+        })
         TriggerEvent('LCV:charselect:load', src, accID)
-    end)
+    end
+end)
+
+-- Abbruch im Editor -> einfach zurück zum Charselect (kein Save)
+RegisterNetEvent('character:Cancel', function(account_id)
+    local src = source
+    log("INFO", ("Editor abgebrochen von %s, zurück zum Charselect."):format(src))
+    TriggerEvent('LCV:charselect:load', src, account_id)
 end)
 
 -- Modell vorbereiten (wird aus dem Editor abgefragt)
@@ -171,11 +257,11 @@ end)
 RegisterNetEvent('character:Sync', function(data, clothes)
     local src = source
 
-    local parsed       = decodeMaybeJSON(data)
+    local parsed        = decodeMaybeJSON(data)
     local parsedClothes = decodeMaybeJSON(clothes)
 
     if not parsed or type(parsed) ~= 'table' then
-        print('[Character Editor] character:Sync: invalid data')
+        log('[WARN]', 'character:Sync: invalid data')
         return
     end
 
