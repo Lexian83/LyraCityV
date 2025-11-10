@@ -146,6 +146,10 @@ local function applyClothes(ped, c)
         end
     end
 
+    -- #############   
+    -- ### Comps ###
+    -- #############
+
     -- Arme
     if c.torso ~= nil then
         comp(3, c.torso, 0)
@@ -171,14 +175,53 @@ local function applyClothes(ped, c)
         comp(6, c.shoes, c.shoesColor or 0)
     end
 
-    -- Brille
+    -- Maske
+    if c.mask ~= nil then
+        comp(1, c.mask, c.maskColor or 0)
+    end
+
+    -- Tasche
+    if c.bag ~= nil then
+        comp(5, c.bag, c.bagColor or 0)
+    end
+
+    -- Accessories
+    if c.accessories ~= nil then
+        comp(7, c.accessories, c.accessoriesColor or 0)
+    end
+
+    -- Body Armor
+    if c.armor ~= nil then
+        comp(7, c.armor, c.armorColor or 0)
+    end
+
+    -- #############   
+    -- ### Props ###
+    -- #############
+    
+    -- Hats
+    if c.hats ~= nil then
+        prop(0, c.hats, c.hatsColor or 0)
+    end
+
+     -- Brille
     if c.glass ~= nil then
         prop(1, c.glass, c.glassColor or 0)
+    end
+
+     -- Ears
+    if c.ears ~= nil then
+        prop(2, c.ears, c.earsColor or 0)
     end
 
     -- Watch
     if c.watch ~= nil then
         prop(6, c.watch, c.watchColor or 0)
+    end
+
+    -- Bracelets
+    if c.watch ~= nil then
+        prop(7, c.watch, c.watchColor or 0)
     end
 end
 
