@@ -1206,8 +1206,18 @@ lib.callback.register('LCV:ADMIN:Home:GetDutyData', function(source, _)
         return { ok = false, error = 'Kein Character aktiv.', dutyFactions = {}, currentDuty = {} }
     end
 
-    local dutyFactions = getDutyFactionsForChar(charId)
-    local currentDuty  = buildCurrentDutyList(charId, dutyFactions)
+    local dutyFactions = exports['factionManager']:GetDutyFactions(charId) or {}
+
+    local currentDuty = {}
+    for _, f in ipairs(dutyFactions) do
+        if f.onDuty then
+            currentDuty[#currentDuty+1] = {
+                id = f.id,
+                name = f.name,
+                label = f.label
+            }
+        end
+    end
 
     return {
         ok = true,
@@ -1215,6 +1225,7 @@ lib.callback.register('LCV:ADMIN:Home:GetDutyData', function(source, _)
         currentDuty  = currentDuty
     }
 end)
+
 
 -- ===== CALLBACK: SET DUTY (NEU, FLOW 2 FIX) =====
 
@@ -1229,56 +1240,22 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
     end
 
     local factionId = tonumber(data and data.faction_id)
-    local on        = data and data.on == true
+    local turnOn    = data and data.on == true
 
     if not factionId then
         return { ok = false, error = 'Ungültige Fraktion.' }
     end
 
-    -- Validieren: ist der Char in dieser Duty-pflichtigen Fraktion Mitglied?
-    local row = MySQL.single.await([[
-        SELECT f.id
-        FROM factions f
-        INNER JOIN faction_members m
-            ON m.faction_id = f.id
-           AND m.char_id = ?
-           AND m.active = 1
-        WHERE f.id = ?
-          AND f.duty_required = 1
-    ]], { charId, factionId })
+    local ok, err, dutyFactions, currentDuty =
+        exports['factionManager']:SetDuty(charId, factionId, turnOn)
 
-    if not row then
-        return { ok = false, error = 'Nicht Mitglied oder Fraktion nicht Duty-pflichtig.' }
+    if not ok then
+        return { ok = false, error = err or 'Fehler beim Setzen des Duty-Status.' }
     end
-
-    if on then
-        -- Einstempeln: Eintrag für diesen Char + Fraktion setzen (doppelte vermeiden)
-        MySQL.update.await([[
-            DELETE FROM pc_duty
-            WHERE char_id = ?
-              AND faction_id = ?
-        ]], { charId, factionId })
-
-        MySQL.insert.await([[
-            INSERT INTO pc_duty (char_id, faction_id)
-            VALUES (?, ?)
-        ]], { charId, factionId })
-    else
-        -- Ausstempeln: nur eigenen Eintrag löschen
-        MySQL.update.await([[
-            DELETE FROM pc_duty
-            WHERE char_id = ?
-              AND faction_id = ?
-        ]], { charId, factionId })
-    end
-
-    -- UI-Response aktualisieren
-    local dutyFactions = getDutyFactionsForChar(charId)
-    local currentDuty  = buildCurrentDutyList(charId, dutyFactions)
 
     return {
         ok = true,
-        dutyFactions = dutyFactions,
-        currentDuty  = currentDuty
+        dutyFactions = dutyFactions or {},
+        currentDuty  = currentDuty or {}
     }
 end)

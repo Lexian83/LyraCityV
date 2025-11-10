@@ -3,7 +3,6 @@
 local FactionCache = {}
 local RankCache = {}        -- [faction_id] = { [rank_id] = row, byLevel = { [level] = row } }
 local MemberCache = {}      -- optional: für schnelle Lookups; hier minimal genutzt
-local DutyState = {}        -- [charId] = { [factionId] = true }
 
 local FactionPermissionSchema = {}
 
@@ -453,36 +452,69 @@ end
 exports('GetFactionLogs', GetFactionLogs)
 
 ----------------------------------------------------------
--- DUTY
+-- DUTY (persistent via faction_duty)
 ----------------------------------------------------------
 
-local function _setDuty(charId, factionId, state)
+-- intern: prüft, ob Char in Fraktion ist & duty_required = 1
+local function _canUseDuty(charId, factionId)
+    charId = tonumber(charId)
+    factionId = tonumber(factionId)
+    if not charId or not factionId then return false end
+
+    local row = MySQL.single.await([[
+        SELECT f.id
+        FROM factions f
+        INNER JOIN faction_members fm
+            ON fm.faction_id = f.id
+           AND fm.char_id = ?
+           AND fm.active = 1
+        WHERE f.id = ?
+          AND f.duty_required = 1
+        LIMIT 1
+    ]], { charId, factionId })
+
+    return row ~= nil
+end
+
+-- intern: schreibt Duty-State in faction_duty
+local function _setDutyPersistent(charId, factionId, state)
     charId = tonumber(charId)
     factionId = tonumber(factionId)
     if not charId or not factionId then
         return false, 'invalid_params'
     end
 
-    DutyState[charId] = DutyState[charId] or {}
-
     if state then
-        DutyState[charId][factionId] = true
+        -- doppelte vermeiden
+        MySQL.update.await([[
+            DELETE FROM faction_duty
+            WHERE char_id = ?
+              AND faction_id = ?
+        ]], { charId, factionId })
+
+        MySQL.insert.await([[
+            INSERT INTO faction_duty (char_id, faction_id)
+            VALUES (?, ?)
+        ]], { charId, factionId })
     else
-        DutyState[charId][factionId] = nil
-        if not next(DutyState[charId]) then
-            DutyState[charId] = nil
-        end
+        MySQL.update.await([[
+            DELETE FROM faction_duty
+            WHERE char_id = ?
+              AND faction_id = ?
+        ]], { charId, factionId })
     end
 
     return true
 end
 
+-- PUBLIC: Duty setzen
 function SetDuty(srcOrChar, factionIdOrName, state)
     local charId = GetCharIdFromSource(srcOrChar) or tonumber(srcOrChar)
     if not charId then
         return false, 'no_char'
     end
 
+    -- Fraktion auflösen (ID oder Name)
     local faction
     if type(factionIdOrName) == 'string' and not tonumber(factionIdOrName) then
         faction = GetFactionByName(factionIdOrName)
@@ -493,22 +525,23 @@ function SetDuty(srcOrChar, factionIdOrName, state)
         return false, 'no_faction'
     end
 
-    -- nur Mitglieder dürfen on duty sein
-    local member = _getMemberWithRank(charId, faction.id)
-    if not member then
-        return false, 'not_member'
+    -- wenn Fraktion keine Duty-Pflicht hat → Duty egal, aber wir erlauben's (für Konsistenz)
+    if IsDutyRequiredForFaction(faction) and not _canUseDuty(charId, faction.id) then
+        return false, 'not_member_or_not_duty_required'
     end
 
-    local ok, err = _setDuty(charId, faction.id, state ~= false)
+    local on = (state ~= false)
+
+    local ok, err = _setDutyPersistent(charId, faction.id, on)
     if not ok then return false, err end
 
-    -- optional loggen:
-    LogFactionAction(faction.id, charId, nil, state and 'duty_on' or 'duty_off', {})
+    LogFactionAction(faction.id, charId, nil, on and 'duty_on' or 'duty_off', {})
 
     return true
 end
 exports('SetDuty', SetDuty)
 
+-- PUBLIC: Prüfen, ob Char für Fraktion on duty ist
 function IsOnDuty(srcOrChar, factionIdOrName)
     local charId = GetCharIdFromSource(srcOrChar) or tonumber(srcOrChar)
     if not charId then return false end
@@ -521,18 +554,58 @@ function IsOnDuty(srcOrChar, factionIdOrName)
     end
     if not faction then return false end
 
-    local member = _getMemberWithRank(charId, faction.id)
-    if not member then return false end
-
-    -- Wenn Fraktion KEINE Duty-Pflicht hat → immer "on duty" für Permissions
+    -- keine Duty-Pflicht => immer "on duty" für Permissions/Checks
     if not IsDutyRequiredForFaction(faction) then
         return true
     end
 
-    local byChar = DutyState[charId]
-    return byChar and byChar[faction.id] == true or false
+    local exists = MySQL.scalar.await([[
+        SELECT 1
+        FROM faction_duty
+        WHERE char_id = ?
+          AND faction_id = ?
+        LIMIT 1
+    ]], { charId, faction.id })
+
+    return exists ~= nil
 end
 exports('IsOnDuty', IsOnDuty)
+
+-- PUBLIC: Liste aller duty-pflichtigen Fraktionen des Char mit onDuty-Flag
+function GetDutyFactions(srcOrChar)
+    local charId = GetCharIdFromSource(srcOrChar) or tonumber(srcOrChar)
+    if not charId then return {} end
+
+    local rows = MySQL.query.await([[
+        SELECT DISTINCT
+            f.id,
+            f.name,
+            f.label,
+            CASE
+                WHEN d.id IS NOT NULL THEN 1
+                ELSE 0
+            END AS onDuty
+        FROM factions f
+        INNER JOIN faction_members fm
+            ON fm.faction_id = f.id
+           AND fm.char_id = ?
+           AND fm.active = 1
+        LEFT JOIN faction_duty d
+            ON d.char_id = fm.char_id
+           AND d.faction_id = f.id
+        WHERE f.duty_required = 1
+        ORDER BY f.label, f.name
+    ]], { charId }) or {}
+
+    for _, f in ipairs(rows) do
+        f.id     = tonumber(f.id) or 0
+        f.onDuty = (f.onDuty == 1 or f.onDuty == true)
+    end
+
+    return rows
+end
+exports('GetDutyFactions', GetDutyFactions)
+
 
 ----------------------------------------------------------
 -- PERMISSIONS (bereinigt)
@@ -579,15 +652,13 @@ function HasFactionPermission(srcOrChar, factionIdOrName, permKey)
     if not member then return false end
 
     -- Duty-Pflicht: wenn gesetzt & nicht on duty -> keine Rechte (außer evtl. ganz oben)
+    -- Duty-Pflicht: wenn gesetzt & nicht on duty -> keine Rechte (außer High-Command)
     if IsDutyRequiredForFaction(faction) then
-        local byChar = DutyState[charId]
-        if not (byChar and byChar[faction.id]) then
-            -- Ausnahme: Super-High-Rank darf immer (optional)
-            if not (tonumber(member.level) >= 100) then
-                return false
-            end
+        if not IsOnDuty(charId, faction.id) and not (tonumber(member.level) >= 100) then
+            return false
         end
     end
+
 
     local perms = member.permissions or {}
 
@@ -1149,17 +1220,3 @@ function SetMemberRank(factionId, charId, newRankId)
 end
 exports('SetMemberRank', SetMemberRank)
 
-
-AddEventHandler('playerDropped', function()
-    local src = source
-    local charId = GetCharIdFromSource(src)
-    if charId and DutyState[charId] then
-        DutyState[charId] = nil
-    end
-end)
-
-AddEventHandler('onResourceStop', function(resName)
-    if resName == GetCurrentResourceName() then
-        DutyState = {}
-    end
-end)

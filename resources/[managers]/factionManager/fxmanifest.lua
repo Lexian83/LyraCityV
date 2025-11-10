@@ -20,9 +20,14 @@ server_exports {
     'GetPlayerFactions',
     'GetFactionMembers',
     'GetAllFactions',
-    'GetFactionRanks',      -- <<< WICHTIG
+    'GetFactionRanks',
     'GetFactionLogs',
+    'GetFactionPermissionSchema',
     'HasFactionPermission',
+    'HasAnyFactionPermission',
+    'IsFactionLeader',
+    'IsOnDuty',
+    'GetDutyFactions',
 
     -- Mutationen
     'CreateFaction',
@@ -36,7 +41,11 @@ server_exports {
     'SetMemberRank',
     'UpdateFaction',
 
+    -- Duty steuern
+    'SetDuty',
+
     -- Logging
     'LogFactionAction'
 }
+
 
