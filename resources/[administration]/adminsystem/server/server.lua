@@ -14,7 +14,6 @@ local function getCharId(src)
     return tonumber(d.character.id) or nil
 end
 
-
 local function hasAdminPermission(src, required)
     local lvl = getCharLVL(src)
     required = tonumber(required) or 10
@@ -89,7 +88,6 @@ local function getAllFactionPerms()
     return rows
 end
 
-
 -- ================== ADMIN UI ÖFFNEN ==================
 
 RegisterNetEvent('LCV:ADMIN:Server:Show', function()
@@ -163,7 +161,6 @@ lib.callback.register('LCV:ADMIN:Interactions:Add', function(source, data)
         return { ok = false, error = 'Insert fehlgeschlagen' }
     end
 
-    -- Alle Interaction-Clients neu syncen (dein Interaction-Manager)
     TriggerEvent('lcv:interaction:server:reloadPoints')
 
     return { ok = true, id = id }
@@ -247,7 +244,9 @@ lib.callback.register('LCV:ADMIN:Interactions:Delete', function(source, data)
 
     return { ok = okDelete, error = okDelete and nil or 'Kein Datensatz gelöscht' }
 end)
+
 -- ================== NPCs: GET ALL ==================
+
 lib.callback.register('LCV:ADMIN:Npcs:GetAll', function(source)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung', npcs = {} }
@@ -275,6 +274,7 @@ lib.callback.register('LCV:ADMIN:Npcs:GetAll', function(source)
 end)
 
 -- ================== NPCs: ADD ==================
+
 lib.callback.register('LCV:ADMIN:Npcs:Add', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -312,14 +312,13 @@ lib.callback.register('LCV:ADMIN:Npcs:Add', function(source, data)
         return { ok = false, error = 'Insert fehlgeschlagen' }
     end
 
-    -- 🔁 Alle NPCs neu laden & an alle Clients senden
     TriggerEvent('npc_reload')
 
     return { ok = true, id = id }
 end)
 
-
 -- ================== NPCs: UPDATE ==================
+
 lib.callback.register('LCV:ADMIN:Npcs:Update', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -363,7 +362,6 @@ lib.callback.register('LCV:ADMIN:Npcs:Update', function(source, data)
     local okUpdate = (affected or 0) > 0
 
     if okUpdate then
-        -- 🔁 neue Liste an alle
         TriggerEvent('npc_reload')
     end
 
@@ -373,8 +371,8 @@ lib.callback.register('LCV:ADMIN:Npcs:Update', function(source, data)
     }
 end)
 
-
 -- ================== NPCs: DELETE ==================
+
 lib.callback.register('LCV:ADMIN:Npcs:Delete', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -397,7 +395,6 @@ lib.callback.register('LCV:ADMIN:Npcs:Delete', function(source, data)
     local okDelete = (affected or 0) > 0
 
     if okDelete then
-        -- 🔁 neue Liste an alle
         TriggerEvent('npc_reload')
     end
 
@@ -453,7 +450,6 @@ lib.callback.register('LCV:ADMIN:Factions:GetCharactersSimple', function(source,
     return { ok = true, characters = list }
 end)
 
-
 lib.callback.register('LCV:ADMIN:Factions:GetDetails', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -475,7 +471,6 @@ lib.callback.register('LCV:ADMIN:Factions:GetDetails', function(source, data)
         logs = logs
     }
 end)
-
 
 lib.callback.register('LCV:ADMIN:Factions:AddMember', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -504,7 +499,6 @@ lib.callback.register('LCV:ADMIN:Factions:AddMember', function(source, data)
     return { ok = true, members = members }
 end)
 
-
 lib.callback.register('LCV:ADMIN:Factions:SetMemberRank', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -532,7 +526,6 @@ lib.callback.register('LCV:ADMIN:Factions:SetMemberRank', function(source, data)
     return { ok = true, members = members }
 end)
 
-
 lib.callback.register('LCV:ADMIN:Factions:RemoveMember', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -557,7 +550,6 @@ lib.callback.register('LCV:ADMIN:Factions:RemoveMember', function(source, data)
     return { ok = true, members = members }
 end)
 
-
 lib.callback.register('LCV:ADMIN:Factions:CreateRank', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -573,26 +565,24 @@ lib.callback.register('LCV:ADMIN:Factions:CreateRank', function(source, data)
 
     local id, reason = exports['factionManager']:CreateRank(factionId, name, level, {})
 
-if not id then
-    local msg = 'Fehler beim Anlegen des Rangs'
-    if reason == 'name_exists' then
-        msg = 'Ein Rang mit diesem Namen existiert in dieser Fraktion bereits.'
-    elseif reason == 'level_exists' then
-        msg = 'Dieses Rang-Level ist in dieser Fraktion bereits vergeben.'
-    elseif reason == 'invalid_params' then
-        msg = 'Ungültige Daten für Rang-Erstellung.'
-    elseif reason == 'db_error' then
-        msg = 'Datenbankfehler beim Anlegen des Rangs.'
+    if not id then
+        local msg = 'Fehler beim Anlegen des Rangs'
+        if reason == 'name_exists' then
+            msg = 'Ein Rang mit diesem Namen existiert in dieser Fraktion bereits.'
+        elseif reason == 'level_exists' then
+            msg = 'Dieses Rang-Level ist in dieser Fraktion bereits vergeben.'
+        elseif reason == 'invalid_params' then
+            msg = 'Ungültige Daten für Rang-Erstellung.'
+        elseif reason == 'db_error' then
+            msg = 'Datenbankfehler beim Anlegen des Rangs.'
+        end
+
+        return { ok = false, error = msg }
     end
 
-    return { ok = false, error = msg }
-end
-
-local ranks = exports['factionManager']:GetFactionRanks(factionId) or {}
-return { ok = true, ranks = ranks }
-
+    local ranks = exports['factionManager']:GetFactionRanks(factionId) or {}
+    return { ok = true, ranks = ranks }
 end)
-
 
 lib.callback.register('LCV:ADMIN:Factions:UpdateRank', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -606,11 +596,10 @@ lib.callback.register('LCV:ADMIN:Factions:UpdateRank', function(source, data)
         return { ok = false, error = 'Ungültige Daten' }
     end
 
-    -- Alles, was vom UI kommt, sauber übernehmen
     local update = {
         name        = data.name,
         level       = data.level and tonumber(data.level) or nil,
-        permissions = data.permissions or {},  -- 🔥 WICHTIG
+        permissions = data.permissions or {},
     }
 
     local okUp, reason = exports['factionManager']:UpdateRank(rankId, update)
@@ -634,9 +623,6 @@ lib.callback.register('LCV:ADMIN:Factions:UpdateRank', function(source, data)
     local ranks = exports['factionManager']:GetFactionRanks(factionId) or {}
     return { ok = true, ranks = ranks }
 end)
-
-
-
 
 lib.callback.register('LCV:ADMIN:Factions:DeleteRank', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -677,7 +663,6 @@ lib.callback.register('LCV:ADMIN:Factions:GetPermissionSchema', function(source,
 
     local schema = loadFactionPermissionSchemaFromDB()
 
-    -- Fallback, falls Tabelle leer ist
     if not next(schema) then
         schema = {
             manage_faction = { label = 'Fraktion bearbeiten' },
@@ -700,7 +685,6 @@ lib.callback.register('LCV:ADMIN:FactionPerms:GetAll', function(source, _)
     local perms = getAllFactionPerms()
     return { ok = true, perms = perms }
 end)
-
 
 lib.callback.register('LCV:ADMIN:FactionPerms:Save', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -728,7 +712,6 @@ lib.callback.register('LCV:ADMIN:FactionPerms:Save', function(source, data)
     end
 
     if data.id then
-        -- UPDATE
         local id = tonumber(data.id)
         if not id then
             return { ok = false, error = 'Ungültige ID' }
@@ -747,7 +730,6 @@ lib.callback.register('LCV:ADMIN:FactionPerms:Save', function(source, data)
             return { ok = false, error = 'DB-Fehler beim Update (Konsole prüfen)' }
         end
     else
-        -- INSERT
         local okQ, res = pcall(function()
             return MySQL.insert.await([[
                 INSERT INTO faction_permission_schema (perm_key, label, allowed_factions, sort_index, is_active)
@@ -764,7 +746,6 @@ lib.callback.register('LCV:ADMIN:FactionPerms:Save', function(source, data)
     local perms = getAllFactionPerms()
     return { ok = true, perms = perms }
 end)
-
 
 lib.callback.register('LCV:ADMIN:FactionPerms:Delete', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -789,9 +770,8 @@ lib.callback.register('LCV:ADMIN:FactionPerms:Delete', function(source, data)
     return { ok = true, perms = perms }
 end)
 
-
-
 -- ================== NPCs: TELEPORT ==================
+
 RegisterNetEvent('LCV:ADMIN:Npcs:Teleport', function(id, x, y, z)
     local src = source
     if not hasAdminPermission(src, 10) then return end
@@ -801,11 +781,8 @@ RegisterNetEvent('LCV:ADMIN:Npcs:Teleport', function(id, x, y, z)
 
     local ped = GetPlayerPed(src)
     if ped ~= 0 then
-        SetEntityCoords(ped, x + 0.0, y + 0.0, z + 0.0, false, false, false, true)
-
-        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, {
-            x = x, y = y, z = z
-        })
+        SetEntityCoords(ped, x, y, z, false, false, false, true)
+        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, { x = x, y = y, z = z })
     end
 end)
 
@@ -820,15 +797,13 @@ RegisterNetEvent('LCV:ADMIN:Interactions:Teleport', function(id, x, y, z)
 
     local ped = GetPlayerPed(src)
     if ped ~= 0 then
-        SetEntityCoords(ped, x + 0.0, y + 0.0, z + 0.0, false, false, false, true)
-
-        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, {
-            x = x, y = y, z = z
-        })
+        SetEntityCoords(ped, x, y, z, false, false, false, true)
+        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, { x = x, y = y, z = z })
     end
 end)
 
 -- ================== BLIPS: GET ALL ==================
+
 lib.callback.register('LCV:ADMIN:Blips:GetAll', function(source)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung', blips = {} }
@@ -859,6 +834,7 @@ lib.callback.register('LCV:ADMIN:Blips:GetAll', function(source)
 end)
 
 -- ================== BLIPS: ADD ==================
+
 lib.callback.register('LCV:ADMIN:Blips:Add', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -899,13 +875,13 @@ lib.callback.register('LCV:ADMIN:Blips:Add', function(source, data)
         return { ok = false, error = 'Insert fehlgeschlagen' }
     end
 
-    -- Blips im Ingame-System neu laden (lcv-blip Resource)
     TriggerEvent('blip_reload')
 
     return { ok = true, id = id }
 end)
 
 -- ================== BLIPS: UPDATE ==================
+
 lib.callback.register('LCV:ADMIN:Blips:Update', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -954,6 +930,7 @@ lib.callback.register('LCV:ADMIN:Blips:Update', function(source, data)
 end)
 
 -- ================== BLIPS: DELETE ==================
+
 lib.callback.register('LCV:ADMIN:Blips:Delete', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -982,6 +959,7 @@ lib.callback.register('LCV:ADMIN:Blips:Delete', function(source, data)
 end)
 
 -- ================== BLIPS: GET PLAYER POS ==================
+
 lib.callback.register('LCV:ADMIN:Blips:GetPlayerPos', function(source)
     local ped = GetPlayerPed(source)
     if not ped or ped == 0 or not DoesEntityExist(ped) then
@@ -991,13 +969,14 @@ lib.callback.register('LCV:ADMIN:Blips:GetPlayerPos', function(source)
     local coords = GetEntityCoords(ped)
     return {
         ok = true,
-        x = coords.x + 0.0,
-        y = coords.y + 0.0,
-        z = coords.z + 0.0
+        x = coords.x,
+        y = coords.y,
+        z = coords.z
     }
 end)
 
 -- ================== BLIPS: TELEPORT ==================
+
 RegisterNetEvent('LCV:ADMIN:Blips:Teleport', function(id, x, y, z)
     local src = source
     if not hasAdminPermission(src, 10) then return end
@@ -1007,15 +986,13 @@ RegisterNetEvent('LCV:ADMIN:Blips:Teleport', function(id, x, y, z)
 
     local ped = GetPlayerPed(src)
     if ped ~= 0 then
-        SetEntityCoords(ped, x + 0.0, y + 0.0, z + 0.0, false, false, false, true)
-        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, {
-            x = x, y = y, z = z
-        })
+        SetEntityCoords(ped, x, y, z, false, false, false, true)
+        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, { x = x, y = y, z = z })
     end
 end)
 
-
 -- ================== TELEPORT TO WAYPOINT ==================
+
 RegisterNetEvent('LCV:ADMIN:TeleportToWaypoint', function(x, y, z)
     local src = source
     if not hasAdminPermission(src, 10) then return end
@@ -1025,13 +1002,11 @@ RegisterNetEvent('LCV:ADMIN:TeleportToWaypoint', function(x, y, z)
 
     local ped = GetPlayerPed(src)
     if ped ~= 0 then
-        SetEntityCoords(ped, x + 0.0, y + 0.0, z + 0.0, false, false, false, true)
-
-        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, {
-            x = x, y = y, z = z
-        })
+        SetEntityCoords(ped, x, y, z, false, false, false, true)
+        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, { x = x, y = y, z = z })
     end
 end)
+
 -- ================== FACTIONS: ADMIN PANEL ==================
 
 lib.callback.register('LCV:ADMIN:Factions:GetAll', function(source, data)
@@ -1042,10 +1017,7 @@ lib.callback.register('LCV:ADMIN:Factions:GetAll', function(source, data)
     local query = data and data.query or ''
     local factions = exports['factionManager']:GetAllFactions(query) or {}
 
-    return {
-        ok = true,
-        factions = factions
-    }
+    return { ok = true, factions = factions }
 end)
 
 lib.callback.register('LCV:ADMIN:Factions:Create', function(source, data)
@@ -1072,7 +1044,6 @@ lib.callback.register('LCV:ADMIN:Factions:Create', function(source, data)
     )
 
     if not id then
-        -- Fallback wie gehabt ...
         local chkId = MySQL.scalar.await('SELECT id FROM factions WHERE name = ?', { name })
         if chkId then
             local faction = exports['factionManager']:GetFactionById(chkId)
@@ -1095,7 +1066,6 @@ lib.callback.register('LCV:ADMIN:Factions:Create', function(source, data)
         return { ok = false, error = msg }
     end
 
-    -- 🔥 Neue Felder setzen (sofern factionManager.UpdateFaction das unterstützt)
     local duty_required = data.duty_required and 1 or 0
     local is_gang       = data.is_gang and 1 or 0
 
@@ -1110,13 +1080,8 @@ lib.callback.register('LCV:ADMIN:Factions:Create', function(source, data)
 
     local faction = exports['factionManager']:GetFactionById(id)
 
-    return {
-        ok = true,
-        faction = faction
-    }
+    return { ok = true, faction = faction }
 end)
-
-
 
 lib.callback.register('LCV:ADMIN:Factions:Update', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -1153,12 +1118,8 @@ lib.callback.register('LCV:ADMIN:Factions:Update', function(source, data)
         fields = updateData
     })
 
-    return {
-        ok = true,
-        faction = faction
-    }
+    return { ok = true, faction = faction }
 end)
-
 
 lib.callback.register('LCV:ADMIN:Factions:Delete', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -1201,7 +1162,6 @@ local function buildCurrentDutyList(charId, dutyFactions)
 
     for _, f in ipairs(dutyFactions) do
         local ok, on = pcall(function()
-            -- Erwartet: factionManager:IsOnDuty(charId, factionId)
             return exports['factionManager']:IsOnDuty(charId, f.id)
         end)
 
@@ -1258,7 +1218,6 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
         return { ok = false, error = 'Ungültige Fraktion.' }
     end
 
-    -- Check: ist der Char dort Mitglied + duty_required?
     local row = MySQL.single.await([[
         SELECT f.id, f.name, f.label
         FROM factions f
@@ -1273,7 +1232,6 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
     end
 
     local okSet, res = pcall(function()
-        -- Erwartet: factionManager:SetDuty(charId, factionId, on)
         return exports['factionManager']:SetDuty(charId, factionId, on)
     end)
 
