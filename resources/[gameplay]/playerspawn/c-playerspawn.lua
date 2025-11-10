@@ -140,6 +140,12 @@ local function applyClothes(ped, c)
         end
     end
 
+    local function prop(idx, drawable, texture)
+        if drawable ~= nil then
+            SetPedPropIndex(ped, idx, drawable, texture or 0, true)
+        end
+    end
+
     -- Arme
     if c.torso ~= nil then
         comp(3, c.torso, 0)
@@ -163,6 +169,16 @@ local function applyClothes(ped, c)
     -- Schuhe
     if c.shoes ~= nil then
         comp(6, c.shoes, c.shoesColor or 0)
+    end
+
+    -- Brille
+    if c.glass ~= nil then
+        prop(1, c.glass, c.glassColor or 0)
+    end
+
+    -- Watch
+    if c.watch ~= nil then
+        prop(6, c.watch, c.watchColor or 0)
     end
 end
 
