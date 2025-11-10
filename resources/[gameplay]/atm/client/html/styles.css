@@ -1,0 +1,204 @@
+/* Minimal dark theme; tune later to match screenshot */
+@import url("https://fonts.googleapis.com/css?family=Roboto|Roboto+Condensed|Roboto+Mono|Staatliches&display=swap");
+:root {
+  --bg: #101012;
+  --panel: #161a22;
+  --panel-2: #1b2030;
+  --text: #e6e6e6;
+  --muted: #a7b0c0;
+  --accent: #6aa0ff;
+  --danger: #ff6a6a;
+  --success: #4cd97b;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --radius: 16px;
+  --grad-a: #924a9c;
+  --grad-b: #5fa1a4;
+}
+*,
+*:focus {
+  outline: none;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0) !important; /* wirklich komplett durchsichtig */
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu,
+    Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+    "Segoe UI Emoji";
+  color: var(--text);
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  background: transparent !important; /* <-- wichtig */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#app .screen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18); /* hier Stellschraube für die Abdunklung */
+  /* Kein backdrop-filter – CEF rendert das teils als schwarz */
+  pointer-events: none; /* Klicks gehen durch zur UI */
+}
+
+.layout {
+  width: min(1200px, 96vw);
+  height: min(700px, 92vh);
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0px;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.brand .logo {
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  border-radius: 10px;
+}
+.nav {
+  display: grid;
+  gap: 8px;
+}
+.nav button {
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.nav button.active {
+  background: rgba(106, 160, 255, 0.12);
+  border-color: rgba(106, 160, 255, 0.3);
+}
+
+.content {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  box-shadow: var(--shadow);
+  padding: 20px;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+  border-radius: 0px;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.title {
+  font-weight: 700;
+  font-size: 18px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  background: var(--panel-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #0b1020;
+  font-weight: 700;
+}
+.btn.success {
+  background: var(--success);
+  color: #0b1020;
+  font-weight: 700;
+}
+.btn.danger {
+  background: var(--danger);
+  color: #0b1020;
+  font-weight: 700;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 16px;
+}
+.kpi {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+.sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.badge.pos {
+  background: rgba(76, 217, 123, 0.15);
+  color: var(--success);
+}
+.badge.neg {
+  background: rgba(255, 106, 106, 0.18);
+  color: var(--danger);
+}
+
+.footer {
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+}
+.hidden {
+  display: none !important;
+}

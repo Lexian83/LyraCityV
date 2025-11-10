@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lyra City V - PC System V1</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+  </head>
+
+  <body>
+    <div id="app" v-if="show">
+      <div class="frame" v-if="show">
+        <img class="tablet-frame" src="m_frame.png" alt="tablet frame" />
+      </div>
+
+      <!-- NEU: Bezel-UI-Schicht über dem Frame -->
+      <div class="frame-ui">
+        <div class="power-logo">
+          <img src="ifruit_logo.png" alt="iFruit Logo" />
+        </div>
+        <button
+          class="close-btn"
+          @click.stop.prevent="closePC"
+          aria-label="Schließen"
+        >
+          <i class="fa-solid fa-power-off"></i>
+        </button>
+      </div>
+
+      <div class="content">
+        <div class="screen">
+          <component
+            :is="getTabComponent"
+            :identity="identity"
+            :officer="officerName"
+            :location="location"
+          ></component>
+        </div>
+      </div>
+    </div>
+
+    <script src="vue.min.js"></script>
+    <script src="utility/menuNames.js"></script>
+    <script src="components/home.js" type="text/javascript"></script>
+    <script src="components/ez.js" type="text/javascript"></script>
+    <script src="components/lspd.js" type="text/javascript"></script>
+    <script
+      src="components/subpages/lspd/akten.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/blitzer.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/dispatch.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/home.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/leitstelle.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/meldungen.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/personen.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/verwaltung.js"
+      type="text/javascript"
+    ></script>
+    <script
+      src="components/subpages/lspd/zulassungsstelle.js"
+      type="text/javascript"
+    ></script>
+    <script src="app.js" type="text/javascript"></script>
+  </body>
+</html>

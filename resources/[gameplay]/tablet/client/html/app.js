@@ -1,0 +1,86 @@
+Vue.config.devtools = true;
+Vue.prototype.window = window;
+
+const app = new Vue({
+  el: "#app",
+  data() {
+    return {
+      show: false,
+      selection: 0,
+      identity: { fname: "", sname: "", birthdate: "", country: "", past: 0 },
+      navOptions: ["Home"],
+    };
+  },
+  computed: {
+    isInactiveNext() {
+      if (this.selection >= this.navOptions.length - 1) {
+        return { inactive: true };
+      }
+
+      return { inactive: false };
+    },
+    isInactiveBack() {
+      if (this.selection <= 0) {
+        return { inactive: true };
+      }
+
+      return { inactive: false };
+    },
+    getTabComponent: function () {
+      return `tab-${this.navOptions[this.selection].toLowerCase()}`;
+    },
+  },
+  methods: {
+    goNext() {
+      if (this.selection >= this.navOptions.length - 1) {
+        return;
+      }
+
+      this.selection += 1;
+    },
+    goBack() {
+      if (this.selection <= 0) {
+        return;
+      }
+
+      this.selection -= 1;
+    },
+    goTo(selection) {
+      this.selection = selection;
+    },
+    isActive(values) {
+      // Wenn ein einzelner Wert übergeben wird, mach ihn zu einem Array
+      if (!Array.isArray(values)) values = [values];
+
+      // true, wenn selection in der Liste vorkommt
+      const active = values.includes(this.selection);
+      return { active };
+    },
+    closeTablet() {
+      const el = document.querySelector("#app");
+      el.style.transition = "opacity 0.8s ease";
+      el.style.opacity = "0";
+      setTimeout(() => {
+        fetch(`https://${GetParentResourceName()}/LCV:Tablet:Hide`, {
+          method: "POST",
+        });
+      }, 800); // warte bis Fade-Out fertig
+    },
+  },
+  mounted() {
+    window.addEventListener("message", (event) => {
+      let data = event.data;
+      if (data.action == "openTablet") {
+        if (this.show) {
+          return;
+        }
+
+        this.show = true;
+        console.log("[TABLET][CLIENT] Get Trigger to Open");
+      } else if (data.action == "closeTablet") {
+        this.show = false;
+        console.log("[TABLET][CLIENT] Get Trigger to Hide");
+      }
+    });
+  },
+});

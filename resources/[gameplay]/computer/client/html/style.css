@@ -1,0 +1,758 @@
+@import url("https://fonts.googleapis.com/css?family=Roboto|Roboto+Condensed|Roboto+Mono|Staatliches&display=swap");
+:root {
+  --bg: #101012;
+  --text: #f2f2f2;
+  --muted: #a8acb3;
+  --grad-a: #924a9c;
+  --grad-b: #5fa1a4;
+  --status-normal: #29c45a;
+  --status-coma: #ff4141;
+  --status-wildlife: #7fd5ff;
+}
+*,
+*:focus {
+  outline: none;
+}
+body,
+html {
+  padding: 0;
+  margin: 0;
+  font-family: "Roboto";
+}
+body {
+  display: flex;
+  justify-content: left;
+  align-items: center;
+  align-content: center;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+::-webkit-scrollbar {
+  width: 2px;
+  background: #323232;
+  box-shadow: -1px 0px 0px 0px rgba(0, 0, 0, 0.25);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0px 2px 0px 0px rgba(0, 0, 0, 0.1);
+}
+::-webkit-scrollbar-thumb:hover {
+  cursor: pointer !important;
+}
+
+/* --- Tablet frame layering --- */
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: block;
+  background: transparent;
+}
+
+.content {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10; /* under the frame */
+}
+
+.frame {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  pointer-events: none; /* clicks pass through to content */
+}
+
+/* optional: a subtle backdrop to help the inner screen pop when the world behind is visible */
+body {
+  background: rgba(0, 0, 0, 0);
+}
+
+/* --- Tablet Screen Safe-Area ------------------------------------------------ */
+/* Passe diese Werte an, bis die innere Fläche exakt in der transparenten Öffnung sitzt. */
+:root {
+  --screen-top: 13.6vh; /* mehr Abstand nach oben */
+  --screen-right: 15.6vw; /* schmaler rechts */
+  --screen-bottom: 25.6vh; /* mehr Abstand unten */
+  --screen-left: 15.6vw; /* schmaler links */
+  --btn-right: 16vw; /* Abstand zur rechten Außenkante der Frame-Grafik */
+  --btn-bottom: 14.5vh; /* Abstand zur unteren Außenkante der Frame-Grafik */
+}
+
+/* Sichere Fläche, die exakt in der Tablet-Öffnung liegt */
+.screen {
+  position: absolute;
+  top: var(--screen-top);
+  right: var(--screen-right);
+  bottom: var(--screen-bottom);
+  left: var(--screen-left);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0px; /* optional: runde Ecken wie beim Glas */
+  background: var(--bg);
+  color: var(--text);
+  padding: 10px;
+}
+/* Optional: Inneres Canvas für Layout-Tests */
+/*.screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  pointer-events: none;
+  border: 2px solid rgb(206, 8, 8);
+}*/
+
+/* --- Close Button ----------------------------------------------------------- */
+.close-btn {
+  position: absolute;
+  /* positioniere relativ zur Frame-Geometrie */
+  right: var(--btn-right);
+  bottom: var(--btn-bottom);
+
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 0, 0, 0.3);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.2s ease, opacity 0.2s ease;
+  z-index: 151; /* sicher über dem Bild */
+  pointer-events: auto !important; /* wichtig wegen globalem pointer-events:none */
+}
+.close-btn:hover {
+  transform: scale(1.05);
+  background: rgba(255, 0, 0, 0.5);
+}
+.close-btn:active {
+  transform: scale(0.97);
+}
+.close-btn i {
+  pointer-events: none;
+}
+/* --- Tablet frame fix: full center overlay --- */
+/* --- Tablet frame overlay --- */
+.tablet-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100vw;
+  height: 100vh;
+  transform: translate(-50%, -50%) scale(0.8); /* deine aktuelle Größe beibehalten */
+  transform-origin: center;
+  object-fit: contain;
+  pointer-events: none;
+}
+.power-logo {
+  position: absolute;
+  bottom: 12vh; /* ggf. anpassen, bis es mittig sitzt */
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 12px;
+  padding: 8px; /* dünner Abstand rund ums Logo */
+  animation: pulseBorder 3s ease-in-out infinite;
+  z-index: 150;
+  pointer-events: none;
+  background: transparent; /* kein grauer Block */
+}
+
+.power-logo img {
+  width: 64px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 6px rgba(0, 153, 255, 0.4));
+}
+
+/* kombi: border + glow-puls */
+@keyframes pulseBorder {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(0, 153, 255, 0.3),
+      inset 0 0 6px rgba(0, 153, 255, 0.3);
+    border: 2px solid rgba(0, 153, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 153, 255, 0.8),
+      inset 0 0 12px rgba(0, 153, 255, 0.8);
+    border: 2px solid rgba(0, 153, 255, 0.8);
+  }
+}
+.lspd-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Top Nav */
+.factionNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+  border-bottom: 1px #7fd5ff solid;
+}
+
+.factionBranding {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.navOptions {
+  display: flex;
+  gap: 10px;
+}
+
+.navOption {
+  cursor: pointer;
+  opacity: 0.6;
+  padding-bottom: 2px;
+}
+
+.navOption.active {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom: 2px solid #ffffff;
+}
+
+/* Header */
+.lspd-header {
+  display: grid;
+  grid-template-columns: 2fr auto 1.5fr; /* links breiter (2 Spalten), Mitte Logo, rechts Infos */
+  align-items: center;
+  gap: 16px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Gruppe links mit 2 Spalten */
+.lspd-header-left-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+}
+
+/* Ein einzelner Info-Block */
+.lspd-header-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9px;
+}
+
+/* Logo wirklich in der Mitte zentrieren */
+.lspd-header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lspd-logo {
+  height: 72px;
+  object-fit: contain;
+}
+
+/* Rechte Seite kann so bleiben wie vorher oder leicht enger gesetzt */
+.lspd-header-right {
+  align-items: flex-end;
+}
+
+.label {
+  font-size: 7px;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.value {
+  font-size: 9px;
+}
+
+/* Personenabfrage */
+.lspd-persons {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lspd-persons h2 {
+  font-size: 12px;
+  margin: 0;
+}
+
+.search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.search-row input {
+  flex: 1;
+  padding: 4px 6px;
+  background: #18181c;
+  border: 1px solid #2a2a30;
+  color: var(--text);
+  font-size: 10px;
+  border-radius: 4px;
+}
+
+.search-row button {
+  padding: 4px 8px;
+  font-size: 10px;
+  border-radius: 4px;
+  border: none;
+  background: var(--grad-b);
+  color: #fff;
+  cursor: pointer;
+}
+
+.person-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px;
+}
+
+.person-table th,
+.person-table td {
+  padding: 3px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.person-table th {
+  text-align: left;
+  font-size: 8px;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 8px;
+}
+
+.status-normal {
+  background: rgba(0, 180, 80, 0.15);
+  color: #29c45a;
+}
+
+.status-wanted {
+  background: rgba(255, 0, 0, 0.15);
+  color: #ff4d4d;
+}
+
+.status-dead {
+  background: rgba(180, 180, 180, 0.12);
+  color: #bfbfbf;
+}
+
+.status-exited {
+  background: rgba(255, 215, 0, 0.12);
+  color: #ffd700;
+}
+
+.info {
+  font-size: 8px;
+  opacity: 0.7;
+}
+
+.error {
+  font-size: 8px;
+  color: #ff4d4d;
+}
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-small {
+  padding: 3px 8px;
+  font-size: 9px;
+  border-radius: 4px;
+  border: none;
+  background: #2e4a7f;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btn-small.primary {
+  background: #3b82f6;
+}
+
+.lspd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.lspd-modal {
+  width: 720px;
+  max-width: 95%;
+  background: #05060a;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 18px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.modal-close {
+  position: absolute;
+  right: 4px;
+  top: 0;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-grid-2col {
+  display: grid;
+  grid-template-columns: 2fr 1.3fr;
+  gap: 10px;
+}
+
+.modal-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-col input,
+.modal-col select,
+.notes-textarea {
+  background: #0b0f18;
+  border: 1px solid #262b34;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.notes-textarea {
+  width: 100%;
+  resize: none;
+  margin-top: 4px;
+}
+
+.flags-col {
+  font-size: 9px;
+}
+
+.flags-col label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.flags-col input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.flags-title {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  opacity: 0.8;
+}
+
+/* Footer Buttons flach, rechts */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-flat {
+  padding: 5px 14px;
+  font-size: 10px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.btn-cancel {
+  background: #7a1e1e;
+  color: #ffffff;
+}
+
+.btn-primary {
+  background: #ffffff;
+  color: #000000;
+}
+
+/* Links/Buttons generell */
+.btn-small,
+.link-btn {
+  cursor: pointer;
+}
+.th-actions {
+  width: 110px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  min-height: 12px;
+  min-width: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  padding-right: 5px;
+}
+
+.akten-btn {
+  color: #9ca3af;
+}
+
+.arrow-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 16px;
+  color: #ffffff;
+}
+
+.arrow-open {
+  transform: rotate(180deg);
+}
+
+/* Danger Bubbles */
+.danger-bubbles {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.danger-bubble {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.danger-bubble.filled-low {
+  background: rgba(34, 197, 94, 0.9);
+}
+
+.danger-bubble.filled-mid {
+  background: rgba(234, 179, 8, 0.9);
+}
+
+.danger-bubble.filled-high {
+  background: rgba(239, 68, 68, 0.95);
+}
+
+.danger-bubble.empty {
+  background: rgba(148, 163, 253, 0.12);
+}
+
+/* Expandierte Zeile */
+.expand-row td {
+  padding: 4px 4px 6px;
+  background: rgba(5, 6, 10, 0.96);
+}
+
+.expand-content {
+  display: grid;
+  grid-template-columns: 1.4fr 1.2fr 1.6fr;
+  gap: 10px;
+  font-size: 11px; /* vorher 8px */
+  line-height: 1.35;
+  color: #f3f3f3;
+}
+
+.expand-col div {
+  margin-bottom: 4px;
+}
+
+.notes-expand {
+  max-height: 100px;
+  overflow-y: auto;
+  padding: 6px;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* Modal-Styles (falls noch nicht gesetzt) */
+.lspd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.lspd-modal {
+  width: 720px;
+  max-width: 95%;
+  background: #05060a;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 18px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.modal-close {
+  position: absolute;
+  right: 4px;
+  top: 0;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-grid-2col {
+  display: grid;
+  grid-template-columns: 2fr 1.3fr;
+  gap: 10px;
+}
+
+.modal-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-col input,
+.modal-col select,
+.notes-textarea {
+  background: #0b0f18;
+  border: 1px solid #262b34;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.flags-col {
+  font-size: 9px;
+}
+
+.flags-col label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.flags-title {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  opacity: 0.8;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-flat {
+  padding: 5px 14px;
+  font-size: 10px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.btn-cancel {
+  background: #7a1e1e;
+  color: #ffffff;
+}
+
+.btn-primary {
+  background: #ffffff;
+  color: #000000;
+}
+.row-persons tr:hover {
+  background: #363636;
+}

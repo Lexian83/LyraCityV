@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lyra City V - Character Editor V1</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+  </head>
+
+  <body>
+    <div id="app" v-if="show">
+      <div class="editor" v-if="show">
+        <div class="sectionName">
+          <span class="title">Character Editor </span>{{menuNames[selection] }}
+        </div>
+        <component
+          v-bind:is="getTabComponent"
+          v-bind="{ data, identity, clothes,countries,editor}"
+        ></component>
+      </div>
+      <div class="navBar">
+        <button @click="goTo(0)" :class="isActive(0)">
+          <img class="icon" src="icons/id-card.png" />
+        </button>
+        <button @click="goTo(1)" :class="isActive(1)">
+          <img class="icon" src="icons/toilet.png" />
+        </button>
+        <button @click="goTo(2)" :class="isActive([2,7,8,9,10])">
+          <img class="icon" src="icons/head.png" />
+        </button>
+        <button @click="goTo(3)" :class="isActive(3)">
+          <img class="icon" src="icons/comb.png" />
+        </button>
+        <button @click="goTo(4)" :class="isActive(4)">
+          <img class="icon" src="icons/dna.png" />
+        </button>
+        <button @click="goTo(5)" :class="isActive(5)">
+          <img class="icon" src="icons/lipstick.png" />
+        </button>
+        <button @click="goTo(11)" :class="isActive(11)">
+          <img class="icon" src="icons/clothes-hanger.png" />
+        </button>
+        <button @click="goTo(6)" :class="isActive(6)">
+          <img class="icon" src="icons/done.png" />
+        </button>
+      </div>
+      <div class="subNavBarDNA" v-show="[2,7,8,9,10].includes(selection)">
+        <button @click="goTo(7)" :class="isActive(7)">
+          <img class="icon" src="icons/nose.png" />
+        </button>
+        <button @click="goTo(8)" :class="isActive(8)">
+          <img class="icon" src="icons/eye.png" />
+        </button>
+        <button @click="goTo(9)" :class="isActive(9)">
+          <img class="icon" src="icons/lips.png" />
+        </button>
+        <button @click="goTo(10)" :class="isActive(10)">
+          <img class="icon" src="icons/cheek.png" />
+        </button>
+      </div>
+      <div class="bottomBar">
+        <button @click="goTo(0)" :class="isActive('selection', 0)">1</button>
+        <button @click="goTo(1)" :class="isActive('selection', 1)">2</button>
+        <button @click="goTo(2)" :class="isActive('selection', 2)">3</button>
+        <button @click="goTo(3)" :class="isActive('selection', 3)">4</button>
+      </div>
+
+      <div class="saveCancelButton">
+        <button @click="goTo(5)">ABBRECHEN</button>
+        <button @click="characterDone()">ABSCHLIE&szlig;EN</button>
+      </div>
+    </div>
+    <script src="vue.min.js"></script>
+    <script src="less.min.js"></script>
+    <script src="utility/hairInfo.js"></script>
+    <script src="utility/hairOverlays.js"></script>
+    <script src="utility/structure.js"></script>
+    <script src="utility/faceNames.js"></script>
+    <script src="utility/overlays.js"></script>
+    <script src="utility/presets.js"></script>
+    <script src="utility/menuNames.js"></script>
+    <script src="utility/tops.js"></script>
+    <script src="components/done.js" type="text/javascript"></script>
+    <script src="components/overlays.js" type="text/javascript"></script>
+    <script src="components/decor.js" type="text/javascript"></script>
+    <script src="components/hair.js" type="text/javascript"></script>
+    <script src="components/structure.js" type="text/javascript"></script>
+    <script src="components/nose.js" type="text/javascript"></script>
+    <script src="components/eye.js" type="text/javascript"></script>
+    <script src="components/lips.js" type="text/javascript"></script>
+    <script src="components/cheek.js" type="text/javascript"></script>
+    <script src="components/parents.js" type="text/javascript"></script>
+    <script src="components/identity.js" type="text/javascript"></script>
+    <script src="components/clothes.js" type="text/javascript"></script>
+    <script src="app.js" type="text/javascript"></script>
+  </body>
+</html>

@@ -1,0 +1,587 @@
+@import url("https://fonts.googleapis.com/css?family=Roboto|Roboto+Condensed|Roboto+Mono|Staatliches&display=swap");
+:root {
+  --bg: #101012;
+  --text: #f2f2f2;
+  --muted: #a8acb3;
+  --grad-a: #924a9c;
+  --grad-b: #5fa1a4;
+  --status-normal: #29c45a;
+  --status-coma: #ff4141;
+  --status-wildlife: #7fd5ff;
+}
+*,
+*:focus {
+  outline: none;
+}
+body,
+html {
+  padding: 0;
+  margin: 0;
+  font-family: "Roboto";
+}
+body {
+  display: flex;
+  justify-content: left;
+  align-items: center;
+  align-content: center;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+.editor {
+  position: fixed;
+  display: grid;
+  min-width: 400px;
+  max-width: 400px;
+  background: linear-gradient(
+    to right,
+    #101012 0%,
+    rgba(16, 16, 18, 0.8) 40%,
+    transparent 100%
+  );
+  height: auto;
+  user-select: none;
+  left: 0px;
+  top: 140px;
+  border-radius: 0px;
+  align-content: flex-start;
+}
+.editor p {
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+  width: 100%;
+}
+.editor button {
+  font-size: 14px;
+  font-family: "Roboto";
+  font-weight: 400;
+  background: var(--bg);
+  border: 0px;
+  color: #ffffff;
+  border-radius: 3px;
+  box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.5);
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: 0.1s;
+  text-align: center;
+  padding: 0;
+  margin: 0;
+}
+.editor button:hover {
+  color: #fafafa;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.editor button:active {
+  color: #fafafa;
+  transform: translateY(-2px);
+  box-shadow: 0px 0px 5px 0px #000000;
+  background: #44c776;
+}
+.editor .full {
+  width: 100%;
+  padding: 6px 0px;
+}
+.editor .danger {
+  background: #ca653d;
+}
+.editor .danger:hover {
+  background: #d39a83;
+}
+.editor .copy {
+  background: #446ea5;
+}
+.editor .copy:hover {
+  background: #8ba8b9;
+}
+.editor .inactive {
+  background: rgba(0, 0, 0, 0.5) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: unset;
+}
+.editor .inactive:active {
+  color: rgba(255, 255, 255, 0.75) !important;
+  transform: unset !important;
+  box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.5) !important;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3) !important;
+}
+.editor .inactive:hover {
+  color: rgba(255, 255, 255, 0.75) !important;
+  box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.5) !important;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3) !important;
+}
+.editor .navigation {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  max-height: 64px;
+  padding: 12px;
+  box-sizing: border-box;
+  box-shadow: 0px 5px 5px 0px rgba(0, 0, 0, 0.3);
+}
+.editor .options {
+  display: block;
+  min-height: calc(-34vh);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 12px 12px 12px;
+  justify-content: flex-start;
+  border-bottom-left-radius: 6px;
+}
+.editor .options .option {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+  background: transparent;
+  border-radius: 0px;
+  border-bottom: 1px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.editor .options .option .label,
+.editor .options .option .value,
+.editor .options .option span {
+  padding-bottom: 6px;
+  font-family: "Roboto Condensed";
+  color: var(--text);
+  font-size: 14px;
+}
+.editor .options .option span {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.75);
+  padding-bottom: 0px !important;
+}
+.editor .options .option .active {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.editor .options .option .split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 12px;
+  width: 100%;
+}
+.editor .options .option .split button {
+  padding: 6px 0px;
+  margin: 0;
+}
+.editor .options .option .gender button {
+  padding: 6px 0px;
+  margin: 0;
+  height: 100px;
+  font-size: 50px;
+  font-family: "Roboto";
+  font-weight: 400;
+}
+.editor .options .option .past button {
+  padding: 6px 0px;
+  margin: 0;
+  height: 100px;
+  font-size: 50px;
+  font-family: "Roboto";
+  font-weight: 400;
+}
+.editor .options .option .past button img {
+  height: 100%;
+  width: 100%;
+}
+.editor .options .option .split-auto {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  column-gap: 0px;
+}
+.editor .options .option .split-auto button {
+  padding: 0px 0px;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  height: 50px;
+  width: 50px;
+  border-radius: 0px;
+}
+.editor .options .option .labelContainer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+.editor .options .option .labelContainer .facetext {
+  color: var(--text);
+  text-shadow: 0px 0px 5px 0px black;
+  font-size: 25px;
+  font-family: "Roboto";
+  font-weight: 400;
+}
+.editor .options .option .controls {
+  display: grid;
+  grid-template-columns: 1fr 4fr 1fr;
+  column-gap: 12px;
+  width: 100%;
+  justify-content: center;
+  align-content: center;
+  align-items: center;
+  justify-items: center;
+}
+.editor .options .option .controls button {
+  padding: 4px 0px;
+  margin: 0;
+  width: 100%;
+  font-weight: 800;
+  font-size: 18px;
+  border-radius: 0px;
+  border: 2px var(--bg) solid;
+}
+.editor .options .option .controls button:hover {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.editor .options .option .inputHolder {
+  display: block;
+  min-height: 25px;
+  justify-content: center;
+  align-content: center;
+  align-items: center;
+}
+.editor .options .option .inputHolder input {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
+  -webkit-transition: 0.2s;
+  transition: opacity 0.2s;
+  border-radius: 0px;
+  box-sizing: border-box;
+}
+
+.editor .options .option .inputHolder input:hover {
+  opacity: 1;
+}
+.editor .options .option .inputHolder input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  background: var(--bg);
+  border: 2px var(--text) solid;
+  cursor: ew-resize;
+  border-radius: 0px;
+  transition: 0.2s;
+}
+.editor .options .option .inputHolder input::-webkit-slider-thumb:hover {
+  background: var(--bg);
+  width: 20px;
+  height: 20px;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.editor .options .option .inputHolder input::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  background: var(--bg);
+  border: 2px var(--text) solid;
+  cursor: ew-resize;
+  border-radius: 0px;
+  transition: 0.2s;
+}
+.editor .options .option .inputHolder input::-moz-range-thumb:hover {
+  background: var(--bg);
+  width: 20px;
+  height: 20px;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.editor .options .option .inputHolder input[type="text"] {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 30px;
+  padding: 6px 10px;
+  background: #101012;
+  outline: none;
+  -webkit-transition: 0.2s;
+  transition: opacity 0.2s;
+  border-radius: 0px;
+  box-sizing: border-box;
+  color: var(--text);
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.editor .options .option .inputHolder input[type="text"]:focus {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.editor .options .option .inputHolder input[type="date"] {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 30px;
+  padding: 6px 10px;
+  background: #101012;
+  outline: none;
+  -webkit-transition: 0.2s;
+  transition: opacity 0.2s;
+  border-radius: 0px;
+  box-sizing: border-box;
+  color: var(--text);
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.editor .options .option .inputHolder input[type="date"]:focus {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+
+.editor .options .option .inputHolder select {
+  width: 100%;
+  padding: 6px 10px;
+  background: #101012;
+  color: var(--text);
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+.editor .options .option .inputHolder select:focus {
+  outline: none;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+
+.editor .options .option textarea {
+  width: 100%;
+  min-height: 300px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(0, 0, 0, 0.75);
+  color: rgba(255, 255, 255, 0.5);
+  font-family: "Roboto Condensed";
+}
+
+::-webkit-scrollbar {
+  width: 2px;
+  background: #323232;
+  box-shadow: -1px 0px 0px 0px rgba(0, 0, 0, 0.25);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0px 2px 0px 0px rgba(0, 0, 0, 0.1);
+}
+::-webkit-scrollbar-thumb:hover {
+  cursor: pointer !important;
+}
+
+.sectionName {
+  position: fixed;
+  display: grid;
+  min-width: 400px;
+  max-width: 400px;
+  height: 100px;
+  user-select: none;
+  left: 0px;
+  top: 20px;
+  color: var(--text);
+  text-shadow: 0px 0px 5px 0px black;
+  align-content: flex-start;
+  border-left: 5px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+  padding-left: 10px;
+  font-size: 60px;
+  font-family: "Roboto";
+  font-weight: 400;
+  background: linear-gradient(
+    to right,
+    #101012 0%,
+    rgba(16, 16, 18, 0.8) 40%,
+    transparent 100%
+  );
+}
+
+.sectionName .title {
+  color: var(--text);
+  text-shadow: 0px 0px 5px 0px black;
+  font-size: 25px;
+  font-family: "Roboto";
+  font-weight: 400;
+}
+
+.navBar {
+  position: fixed;
+  display: flex; /* oder grid */
+  flex-direction: column; /* = untereinander */
+  gap: 6px; /* kleiner Abstand */
+  min-width: 50px;
+  background: transparent;
+  padding: 6px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%); /* vertikal mittig */
+}
+
+.navBar button {
+  display: block; /* Standard für Buttons */
+  width: 100%; /* volle Breite des Containers */
+  background: var(--bg);
+  border: none;
+  color: white;
+  padding: 8px;
+  cursor: pointer;
+  transition: 0.1s;
+  height: 80px;
+  background: var(--bg);
+  box-shadow: 0px 0px 5px 0px black;
+  border: 2px var(--bg) solid;
+}
+.navBar button:hover {
+  color: #fafafa;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+
+.navBar button.active {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.navBar button .icon {
+  height: 48px;
+  width: 48px;
+}
+.saveCancelButton {
+  position: fixed;
+  display: flex; /* oder grid */
+  flex-direction: row; /* = untereinander */
+  gap: 6px; /* kleiner Abstand */
+  min-width: 150px;
+  min-height: 80px;
+  background: transparent;
+  padding: 0px;
+  right: 10px;
+  bottom: 20px;
+  transform: translateY(-50%); /* vertikal mittig */
+}
+
+.saveCancelButton button {
+  display: block; /* Standard für Buttons */
+  width: 100%; /* volle Breite des Containers */
+  background: var(--bg);
+  border: none;
+  color: white;
+  padding: 8px;
+  cursor: pointer;
+  transition: 0.1s;
+  height: 80px;
+  background: var(--bg);
+  box-shadow: 0px 0px 5px 0px black;
+  border: 2px var(--bg) solid;
+}
+.saveCancelButton button .cancelButton {
+  position: fixed;
+  display: flex; /* oder grid */
+  flex-direction: column; /* = untereinander */
+  gap: 6px; /* kleiner Abstand */
+  min-width: 10px;
+  height: 50px !important;
+  background: transparent;
+  padding: 6px;
+}
+.saveCancelButton button:hover {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+
+.bottomBar {
+  position: fixed;
+  display: flex; /* oder grid */
+  flex-direction: row; /* = untereinander */
+  gap: 6px; /* kleiner Abstand */
+  min-height: 50px;
+  background: transparent;
+  right: 10px;
+  top: 10px;
+  border-bottom: 1px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+
+.bottomBar button {
+  display: block; /* Standard für Buttons */
+  background: var(--bg);
+  color: white;
+  cursor: pointer;
+  height: 40px;
+  width: 40px;
+  background: var(--bg);
+  box-shadow: 0px 0px 5px 0px black;
+  border: 2px var(--bg) solid;
+}
+.bottomBar button:hover {
+  color: #fafafa;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.faces {
+  height: 45px;
+  width: 45px;
+}
+
+.subNavBarDNA {
+  position: fixed;
+  display: flex; /* oder grid */
+  flex-direction: column; /* = untereinander */
+  gap: 6px; /* kleiner Abstand */
+  width: 30px;
+  background: transparent;
+  padding: 6px;
+  right: 120px;
+  top: 50%;
+  transform: translateY(-50%); /* vertikal mittig */
+}
+
+.subNavBarDNA button {
+  display: block; /* Standard für Buttons */
+  width: 100%; /* volle Breite des Containers */
+  background: var(--bg);
+  border: none;
+  color: white;
+  padding: 2px;
+  cursor: pointer;
+  transition: 0.1s;
+  height: 30px;
+  background: var(--bg);
+  box-shadow: 0px 0px 5px 0px black;
+  border: 2px var(--bg) solid;
+}
+.subNavBarDNA button:hover {
+  color: #fafafa;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+
+.subNavBarDNA button.active {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, var(--grad-a), var(--grad-b)) 1;
+}
+.subNavBarDNA button .icon {
+  height: 24px;
+  width: 24px;
+}
+.date-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.date-wrapper input[type="date"] {
+  padding-right: 35px; /* Platz fürs Icon */
+}
+
+.date-wrapper i {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--grad-b);
+  pointer-events: none;
+}

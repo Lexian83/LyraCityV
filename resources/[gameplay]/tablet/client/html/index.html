@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lyra City V - MobileSystem for Tablets V1</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+  </head>
+
+  <body>
+  <body>
+    <div id="app" v-if="show">
+      <div class="frame" v-if="show">
+        <img class="tablet-frame" src="frame_2.png" alt="tablet frame" />
+      </div>
+
+      <!-- NEU: Bezel-UI-Schicht über dem Frame -->
+      <div class="frame-ui">
+        <div class="power-logo">
+          <button 
+          class="close-btn2"
+          @click.stop.prevent="closeTablet"
+          aria-label="Schließen"
+        >
+          <img src="ifruit_logo_left.png" alt="iFruit Logo"/>
+        </button>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="screen">
+          <div class="notch">
+            <div class="time">22:00</div>
+            <div class="icons">
+              <i class="fa-solid fa-signal"></i>
+              <i class="fa-solid fa-battery-three-quarters"></i>
+              <i class="fa-solid fa-envelope"></i>
+              <i class="fa-solid fa-bell"></i>
+              <i class="fa-solid fa-bell-slash"></i>
+            </div>
+          </div>
+          <component
+            v-bind:is="getTabComponent"
+            v-bind="{identity}"
+          ></component>
+        </div>
+      </div>
+      <!--<div class="navBar">
+        <button @click="goTo(0)" :class="isActive(0)">
+          <img class="icon" src="icons/id-card.png" />
+        </button>
+      </div>-->
+    </div>
+    <script src="vue.min.js"></script>
+    <script src="utility/menuNames.js"></script>
+    <script src="components/home.js" type="text/javascript"></script>
+    <script src="app.js" type="text/javascript"></script>
+  </body>
+</html>

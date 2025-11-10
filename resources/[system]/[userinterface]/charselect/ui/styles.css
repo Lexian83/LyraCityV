@@ -1,0 +1,246 @@
+:root {
+  --bg: #101012;
+  --text: #f2f2f2;
+  --muted: #a8acb3;
+  --grad-a: #924a9c;
+  --grad-b: #5fa1a4;
+  --status-normal: #29c45a;
+  --status-coma: #ff4141;
+  --status-wildlife: #7fd5ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    sans-serif;
+  overflow: hidden;
+}
+#app {
+  position: fixed;
+  inset: 0;
+  background: var(--bg); /* <— hierhin verlagert */
+}
+
+.hidden {
+  display: none;
+}
+
+.deco {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: min(36vw, 520px);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.brand {
+  position: fixed;
+  right: auto; /* nach rechts */
+  left: 48px; /* links lösen */
+  top: 48px;
+  text-align: left;
+  letter-spacing: 0.08em;
+  line-height: 1.05;
+  user-select: none;
+}
+.brand-line {
+  font-size: 44px;
+  font-weight: 800;
+  opacity: 0.95;
+}
+.brand-line.big {
+  font-size: 72px;
+  font-weight: 900;
+  margin-top: 0;
+  transform: translateY(-4px);
+}
+
+.grid {
+  /* der .tiles-Grid übernimmt die Anordnung, hier nur Layout-Rand */
+  display: block;
+  padding: 2rem 3rem 3rem;
+  width: 100%;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; /* engerer Abstand (zuvor 28px) */
+  justify-content: center; /* Grid mittig auf der Seite */
+  justify-items: center; /* Karten selbst mittig */
+  width: 100%;
+  max-width: 1200px; /* optional: verhindert, dass es zu breit wird */
+  margin: 0 auto; /* zentriert das Grid im Panel */
+}
+
+.tile {
+  width: 280px;
+  height: 420px;
+  background: rgba(16, 16, 18, 0.75);
+  backdrop-filter: blur(2px);
+  border-radius: 0px;
+  position: relative;
+  padding: 18px 20px;
+  cursor: pointer;
+  margin: 4px;
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out,
+    background 0.15s ease-out;
+}
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0px;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--grad-a), var(--grad-b));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.tile:hover,
+.tile:focus-visible {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.tile .portrait {
+  width: 120px;
+  height: 120px;
+  border-radius: 8px;
+  margin: 12px auto 16px;
+  background: #0e0e0f center/cover no-repeat;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tile .name {
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  margin-top: 6px;
+  color: #fff;
+}
+.tile .dob {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.status {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.status .label {
+  color: var(--muted);
+  margin-right: 6px;
+  font-weight: 600;
+}
+.status .value {
+  color: var(--status-normal);
+}
+
+.status.coma .value {
+  color: var(--status-coma);
+}
+.status.wildlife .value {
+  color: var(--status-wildlife);
+}
+
+.plus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 72px;
+  font-weight: 900;
+  color: #e9eef0;
+  height: 100%;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding-top: 220px; /* Platz unter dem Brand oben rechts */
+}
+
+.panel.deco-bg::after, /* falls du <div class="panel deco-bg"> lassen willst */
+.panel::after {
+  /* …oder einfach immer */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("assets/deco.png") no-repeat bottom center / cover;
+  opacity: 100.12; /* dezent – dein aktuelles "100" macht’s voll */
+  pointer-events: none; /* blockiert nichts */
+  z-index: 0;
+}
+
+.panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.gender-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+  background: #111;
+  color: #fff;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+/* optionale Farbcodes pro Gender */
+.tile[data-gender="male"] .gender-badge {
+  background: #1e3a8a;
+}
+.tile[data-gender="female"] .gender-badge {
+  background: #7c1d3f;
+}
+.tile[data-gender="other"] .gender-badge {
+  background: #3b3b3b;
+}
+
+@media (max-width: 1280px) {
+  .tiles {
+    grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+    gap: 22px;
+  }
+  .tile {
+    width: 248px;
+    height: 392px;
+  }
+}
+
+@media (max-height: 720px) {
+  .brand {
+    transform: scale(0.9);
+    transform-origin: top left;
+  }
+  .tile {
+    transform: scale(0.95);
+  }
+  .tile:hover {
+    transform: translateY(-6px) scale(0.95);
+  }
+}
