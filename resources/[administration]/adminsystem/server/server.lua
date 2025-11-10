@@ -947,7 +947,7 @@ lib.callback.register('LCV:ADMIN:Blips:Delete', function(source, data)
 
     if not okQuery then
         print(('[LCV:ADMIN] BLIP Delete error for id %s: %s'):format(id, tostring(affected)))
-        return { ok = false, error = 'DB-Fehler (siehe Server-Konsole)' }
+        return { ok = false, error = 'DB-Fehler beim Löschen (Konsole prüfen)' }
     end
 
     local okDelete = (affected or 0) > 0
@@ -1139,30 +1139,43 @@ lib.callback.register('LCV:ADMIN:Factions:Delete', function(source, data)
     return { ok = true }
 end)
 
--- ===== HOME: DUTY HELFER =====
+-- ===== HOME: DUTY HELFER (NEU, FLOW 2 FIX) =====
 
+-- Holt alle Duty-pflichtigen Fraktionen für den Char und markiert onDuty
+-- anhand von pc_duty-Einträgen NUR für diesen Char.
 local function getDutyFactionsForChar(charId)
     if not charId then return {} end
 
+    -- Annahme: pc_duty hat Spalten (char_id, faction_id).
+    -- Wenn du stattdessen "faction" (Name) speicherst, unten Kommentar beachten.
     local rows = MySQL.query.await([[
-        SELECT DISTINCT f.id, f.name, f.label
+        SELECT DISTINCT
+            f.id,
+            f.name,
+            f.label,
+            CASE
+                WHEN d.char_id IS NOT NULL THEN 1
+                ELSE 0
+            END AS onDuty
         FROM factions f
-        INNER JOIN faction_members m ON m.faction_id = f.id
+        INNER JOIN faction_members m
+            ON m.faction_id = f.id
+           AND m.char_id = ?
+           AND m.active = 1
+        LEFT JOIN pc_duty d
+            ON d.char_id = m.char_id
+           AND d.faction_id = f.id
         WHERE f.duty_required = 1
-          AND m.char_id = ?
         ORDER BY f.label, f.name
     ]], { charId }) or {}
 
     for _, f in ipairs(rows) do
-        local ok, on = pcall(function()
-            return exports['factionManager']:IsOnDuty(charId, f.id)
-        end)
-        f.onDuty = (ok and on == true) or false
+        f.id     = tonumber(f.id) or 0
+        f.onDuty = (f.onDuty == 1 or f.onDuty == true)
     end
 
     return rows
 end
-
 
 local function buildCurrentDutyList(charId, dutyFactions)
     local current = {}
@@ -1198,13 +1211,12 @@ lib.callback.register('LCV:ADMIN:Home:GetDutyData', function(source, _)
 
     return {
         ok = true,
-        dutyFactions = dutyFactions, -- enthält onDuty pro Fraktion
-        currentDuty  = currentDuty   -- reine Liste nur der aktiven
+        dutyFactions = dutyFactions,
+        currentDuty  = currentDuty
     }
 end)
 
-
--- ===== CALLBACK: SET DUTY =====
+-- ===== CALLBACK: SET DUTY (NEU, FLOW 2 FIX) =====
 
 lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
     if not hasAdminPermission(source, 1) then
@@ -1223,31 +1235,44 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
         return { ok = false, error = 'Ungültige Fraktion.' }
     end
 
-    -- Validieren: ist der Char in dieser Pflicht-Fraktion Mitglied?
+    -- Validieren: ist der Char in dieser Duty-pflichtigen Fraktion Mitglied?
     local row = MySQL.single.await([[
         SELECT f.id
         FROM factions f
-        INNER JOIN faction_members m ON m.faction_id = f.id
+        INNER JOIN faction_members m
+            ON m.faction_id = f.id
+           AND m.char_id = ?
+           AND m.active = 1
         WHERE f.id = ?
           AND f.duty_required = 1
-          AND m.char_id = ?
-          AND m.active = 1
-    ]], { factionId, charId })
+    ]], { charId, factionId })
 
     if not row then
         return { ok = false, error = 'Nicht Mitglied oder Fraktion nicht Duty-pflichtig.' }
     end
 
-    local okSet, res = pcall(function()
-        return exports['factionManager']:SetDuty(charId, factionId, on)
-    end)
+    if on then
+        -- Einstempeln: Eintrag für diesen Char + Fraktion setzen (doppelte vermeiden)
+        MySQL.update.await([[
+            DELETE FROM pc_duty
+            WHERE char_id = ?
+              AND faction_id = ?
+        ]], { charId, factionId })
 
-    if not okSet or not res then
-        print('[LCV:ADMIN:Home:SetDuty] Fehler in SetDuty:', res)
-        return { ok = false, error = 'Duty konnte nicht gesetzt werden (Log prüfen).' }
+        MySQL.insert.await([[
+            INSERT INTO pc_duty (char_id, faction_id)
+            VALUES (?, ?)
+        ]], { charId, factionId })
+    else
+        -- Ausstempeln: nur eigenen Eintrag löschen
+        MySQL.update.await([[
+            DELETE FROM pc_duty
+            WHERE char_id = ?
+              AND faction_id = ?
+        ]], { charId, factionId })
     end
 
-    -- Response wie beim GetDutyData, damit das UI sofort aktualisieren kann
+    -- UI-Response aktualisieren
     local dutyFactions = getDutyFactionsForChar(charId)
     local currentDuty  = buildCurrentDutyList(charId, dutyFactions)
 
@@ -1257,4 +1282,3 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
         currentDuty  = currentDuty
     }
 end)
-
