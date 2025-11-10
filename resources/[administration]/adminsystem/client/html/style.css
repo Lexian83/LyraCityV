@@ -1218,3 +1218,76 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+/* Character Tab spezifisch */
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-locked {
+  background: rgba(255, 65, 65, 0.15);
+  color: #ff4141;
+}
+
+.status-pending {
+  background: rgba(255, 165, 0, 0.15);
+  color: #ffb347;
+}
+
+.status-active {
+  background: rgba(41, 196, 90, 0.15);
+  color: #29c45a;
+}
+
+.online-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.online-badge.on {
+  background: rgba(41, 196, 90, 0.16);
+  color: #29c45a;
+}
+
+.online-badge.off {
+  background: rgba(200, 200, 200, 0.08);
+  color: #888;
+}
+.search-input {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 11px;
+  margin-right: 6px;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.table-interactions th {
+  cursor: default;
+  user-select: none;
+}
+
+.table-interactions th.sortable {
+  cursor: pointer;
+}
+
+.sort-indicator {
+  font-size: 8px;
+  margin-left: 3px;
+  opacity: 0.7;
+}

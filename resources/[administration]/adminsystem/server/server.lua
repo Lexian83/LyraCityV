@@ -52,16 +52,6 @@ local function loadFactionPermissionSchemaFromDB()
     return schema
 end
 
-local function reloadFactionPermSchemaExternal()
-    if GetResourceState('factionManager') == 'started' then
-        pcall(function()
-            if exports['factionManager'].ReloadFactionPermissionSchema then
-                exports['factionManager']:ReloadFactionPermissionSchema()
-            end
-        end)
-    end
-end
-
 local function getAllFactionPerms()
     local rows = MySQL.query.await([[
         SELECT id, perm_key, label, allowed_factions, sort_index, is_active
@@ -87,6 +77,193 @@ local function getAllFactionPerms()
 
     return rows
 end
+-- ================== CHARACTERS: HELPERS ==================
+
+local function getOnlineCharacterIds()
+    local online = {}
+
+    if not exports['playerManager'] or not exports['playerManager'].GetPlayerData then
+        return online
+    end
+
+    for _, sid in ipairs(GetPlayers()) do
+        local src = tonumber(sid)
+        if src then
+            local ok, data = pcall(function()
+                return exports['playerManager']:GetPlayerData(src)
+            end)
+
+            if ok and data and data.character and data.character.id then
+                local cid = tonumber(data.character.id)
+                if cid then
+                    online[cid] = true
+                end
+            end
+        end
+    end
+
+    return online
+end
+
+-- ================== CHARACTERS: GET ALL ==================
+
+lib.callback.register('LCV:ADMIN:Characters:GetAll', function(source, _)
+    if not hasAdminPermission(source, 10) then
+        return { ok = false, error = 'Keine Berechtigung', characters = {} }
+    end
+
+    local rows = MySQL.query.await([[
+        SELECT
+            id,
+            account_id,
+            name,
+            level,
+            birthdate,
+            type,
+            is_locked,
+            residence_permit,
+            past
+        FROM characters
+        ORDER BY id DESC
+        LIMIT 500
+    ]]) or {}
+
+    local online = getOnlineCharacterIds()
+
+        for _, r in ipairs(rows) do
+        r.id               = tonumber(r.id) or 0
+        r.account_id       = tonumber(r.account_id) or 0
+        r.level            = tonumber(r.level) or 0
+        r.type             = tonumber(r.type) or 0
+        r.is_locked        = (r.is_locked == 1 or r.is_locked == true)
+        r.residence_permit = (r.residence_permit == 1 or r.residence_permit == true)
+        r.past             = (r.past == 1 or r.past == true)
+
+        -- Online Flag
+        r.online = online[r.id] == true
+
+        -- Birthdate nur akzeptieren, wenn es wie YYYY-MM-DD aussieht
+        if r.birthdate and type(r.birthdate) == "string" then
+            local y, m, d = r.birthdate:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+            if y and m and d then
+                r.birthdate = string.format("%s-%s-%s", y, m, d)
+            else
+                -- falls irgendwas komisch ist: lieber "-" anzeigen lassen
+                r.birthdate = nil
+            end
+        end
+    end
+
+
+    return { ok = true, characters = rows }
+end)
+
+-- ================== CHARACTERS: UPDATE ==================
+
+lib.callback.register('LCV:ADMIN:Characters:Update', function(source, data)
+    if not hasAdminPermission(source, 10) then
+        return { ok = false, error = 'Keine Berechtigung' }
+    end
+
+    if not data or not data.id then
+        return { ok = false, error = 'Ungültige Daten' }
+    end
+
+    local id = tonumber(data.id)
+    if not id then
+        return { ok = false, error = 'Ungültige ID' }
+    end
+
+    local is_locked        = data.is_locked and 1 or 0
+    local residence_perm   = tonumber(data.residence_permit) or (data.residence_permit and 1 or 0)
+
+    local affected = MySQL.update.await([[
+        UPDATE characters
+        SET is_locked = ?, residence_permit = ?
+        WHERE id = ?
+    ]], { is_locked, residence_perm, id })
+
+    if not affected or affected <= 0 then
+        return { ok = false, error = 'Keine Änderung vorgenommen' }
+    end
+
+    -- aktualisierten Datensatz zurückgeben
+    local row = MySQL.single.await([[
+        SELECT
+            id,
+            account_id,
+            name,
+            level,
+            birthdate,
+            type,
+            is_locked,
+            residence_permit,
+            past
+        FROM characters
+        WHERE id = ?
+    ]], { id })
+
+        for _, r in ipairs(rows) do
+        r.id               = tonumber(r.id) or 0
+        r.account_id       = tonumber(r.account_id) or 0
+        r.level            = tonumber(r.level) or 0
+        r.type             = tonumber(r.type) or 0
+        r.is_locked        = (r.is_locked == 1 or r.is_locked == true)
+        r.residence_permit = (r.residence_permit == 1 or r.residence_permit == true)
+        r.past             = (r.past == 1 or r.past == true)
+
+        -- Online Flag
+        r.online = online[r.id] == true
+
+        -- Birthdate nur akzeptieren, wenn es wie YYYY-MM-DD aussieht
+        if r.birthdate and type(r.birthdate) == "string" then
+            local y, m, d = r.birthdate:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+            if y and m and d then
+                r.birthdate = string.format("%s-%s-%s", y, m, d)
+            else
+                -- falls irgendwas komisch ist: lieber "-" anzeigen lassen
+                r.birthdate = nil
+            end
+        end
+    end
+
+
+    return { ok = true, row = row }
+end)
+
+-- ================== CHARACTERS: DELETE ==================
+
+lib.callback.register('LCV:ADMIN:Characters:Delete', function(source, data)
+    if not hasAdminPermission(source, 10) then
+        return { ok = false, error = 'Keine Berechtigung' }
+    end
+
+    local id = tonumber(data and data.id)
+    if not id then
+        return { ok = false, error = 'Ungültige ID' }
+    end
+
+    -- nicht erlauben, wenn Char online ist
+    local online = getOnlineCharacterIds()
+    if online[id] then
+        return { ok = false, error = 'Character ist aktuell online und kann nicht gelöscht werden.' }
+    end
+
+    local okQ, affected = pcall(function()
+        return MySQL.update.await('DELETE FROM characters WHERE id = ?', { id })
+    end)
+
+    if not okQ then
+        print(('[LCV:ADMIN] CHAR Delete error for id %s: %s'):format(id, tostring(affected)))
+        return { ok = false, error = 'DB-Fehler beim Löschen (Konsole prüfen)' }
+    end
+
+    if not affected or affected <= 0 then
+        return { ok = false, error = 'Kein Datensatz gelöscht' }
+    end
+
+    return { ok = true }
+end)
 
 -- ================== ADMIN UI ÖFFNEN ==================
 
@@ -1139,60 +1316,6 @@ lib.callback.register('LCV:ADMIN:Factions:Delete', function(source, data)
     return { ok = true }
 end)
 
--- ===== HOME: DUTY HELFER (NEU, FLOW 2 FIX) =====
-
--- Holt alle Duty-pflichtigen Fraktionen für den Char und markiert onDuty
--- anhand von pc_duty-Einträgen NUR für diesen Char.
-local function getDutyFactionsForChar(charId)
-    if not charId then return {} end
-
-    -- Annahme: pc_duty hat Spalten (char_id, faction_id).
-    -- Wenn du stattdessen "faction" (Name) speicherst, unten Kommentar beachten.
-    local rows = MySQL.query.await([[
-        SELECT DISTINCT
-            f.id,
-            f.name,
-            f.label,
-            CASE
-                WHEN d.char_id IS NOT NULL THEN 1
-                ELSE 0
-            END AS onDuty
-        FROM factions f
-        INNER JOIN faction_members m
-            ON m.faction_id = f.id
-           AND m.char_id = ?
-           AND m.active = 1
-        LEFT JOIN pc_duty d
-            ON d.char_id = m.char_id
-           AND d.faction_id = f.id
-        WHERE f.duty_required = 1
-        ORDER BY f.label, f.name
-    ]], { charId }) or {}
-
-    for _, f in ipairs(rows) do
-        f.id     = tonumber(f.id) or 0
-        f.onDuty = (f.onDuty == 1 or f.onDuty == true)
-    end
-
-    return rows
-end
-
-local function buildCurrentDutyList(charId, dutyFactions)
-    local current = {}
-    if not charId or not dutyFactions then return current end
-
-    for _, f in ipairs(dutyFactions) do
-        if f.onDuty then
-            current[#current+1] = {
-                id = f.id,
-                name = f.name,
-                label = f.label
-            }
-        end
-    end
-
-    return current
-end
 
 -- ===== CALLBACK: GET DUTY DATA =====
 

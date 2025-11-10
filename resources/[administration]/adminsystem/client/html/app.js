@@ -15,6 +15,7 @@ const app = new Vue({
         "Blips",
         "Faction",
         "Faction_Perms",
+        "Character",
       ],
     };
   },

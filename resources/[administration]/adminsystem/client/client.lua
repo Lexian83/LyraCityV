@@ -847,6 +847,37 @@ RegisterNUICallback('LCV:ADMIN:Home:SetDuty', function(data, cb)
 end)
 
 
+-- ===== CHARACTERS: GetAll =====
+RegisterNUICallback('LCV:ADMIN:Characters:GetAll', function(_, cb)
+    lib.callback('LCV:ADMIN:Characters:GetAll', false, function(result)
+        cb(result or { ok = false, error = 'no_response', characters = {} })
+    end)
+end)
+
+-- ===== CHARACTERS: Update =====
+RegisterNUICallback('LCV:ADMIN:Characters:Update', function(data, cb)
+    if not data or not data.id then
+        cb({ ok = false, error = 'missing_id' })
+        return
+    end
+
+    lib.callback('LCV:ADMIN:Characters:Update', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
+-- ===== CHARACTERS: Delete =====
+RegisterNUICallback('LCV:ADMIN:Characters:Delete', function(data, cb)
+    if not data or not data.id then
+        cb({ ok = false, error = 'missing_id' })
+        return
+    end
+
+    lib.callback('LCV:ADMIN:Characters:Delete', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
 -- Cleanup
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then
