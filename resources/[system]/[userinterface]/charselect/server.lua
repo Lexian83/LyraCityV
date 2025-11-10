@@ -1,138 +1,272 @@
--- LCV Character Select - Server Side
--- Dependencies: oxmysql
--- Ensure order in server.cfg: ensure oxmysql, ensure log (optional), ensure LCV_charselect
+-- LCV Character Select - Server Side (ACE-free, type-safe)
 
-local MAX_CHARACTERS = 6             -- adjust for your server
-local SHOW_PLUS_REQUIRES_ACE = false  -- if true, player needs ace 'LCV.char.create' AND slots left
+local MAX_CHARACTERS = 6
 
--- Optional logger bridge
 local function slog(level, msg)
+    level = level or "info"
     if LCV and LCV.Util and LCV.Util.log then
         return LCV.Util.log(level, msg)
+    else
+        print(("[LCV-CharSelect][%s] %s"):format(level:upper(), tostring(msg)))
     end
-    -- print(("[LCV-CharSelect][%s] %s"):format((level or 'INFO'):upper(), tostring(msg)))
 end
 
--- Identifier helper
-local function getIdentifier(src)
-    local ids = GetPlayerIdentifiers(src)
-    local license, license2, fivem, steam, discord
-    for _, id in ipairs(ids) do
-        if id:find("license2:") == 1 then license2 = id
-        elseif id:find("license:") == 1 then license = id
-        elseif id:find("fivem:") == 1 then fivem = id
-        elseif id:find("steam:") == 1 then steam = id
-        elseif id:find("discord:") == 1 then discord = id
+local function getDiscordId(src)
+    src = tonumber(src)
+    if not src then return nil end
+
+    for _, id in ipairs(GetPlayerIdentifiers(src)) do
+        if id:sub(1, 8) == "discord:" then
+            return id:sub(9)
         end
     end
-    return license2 or license or fivem or steam or discord or ids[1]
 end
 
--- Build payload
-local function buildPayload(src, id, cb)
-    local identifier = id
+-- Charaktere für Account laden
+local function loadCharactersForAccount(src, accountId, accountNewFlag, cb)
+    if not accountId then
+        return cb({
+            canCreate     = false,
+            maxCharacters = MAX_CHARACTERS,
+            characters    = {}
+        }, nil)
+    end
 
-    -- A) "new" als Zahl erzwingen
-    exports.oxmysql:fetch("SELECT CAST(`new` AS UNSIGNED) AS new FROM accounts WHERE id = ?", { identifier }, function(accountRows)
-        local canCreate = false
-        if accountRows and accountRows[1] and accountRows[1].new == 1 then
-            canCreate = true
-        end
+    MySQL.query([[
+        SELECT
+            id,
+            account_id,
+            name,
+            gender,
+            DATE_FORMAT(birthdate, '%d.%m.%Y') AS birthdate,
+            type,
+            is_locked
+        FROM characters
+        WHERE account_id = ?
+        ORDER BY id ASC
+    ]], { accountId }, function(rows)
+        rows = rows or {}
+        local characters = {}
 
-        -- Debug optional
-        -- print('NEW?:', accountRows and accountRows[1] and accountRows[1].new, 'type=', type(accountRows and accountRows[1] and accountRows[1].new))
-
-        exports.oxmysql:fetch([[
-            SELECT id, account_id, name, gender,
-                   DATE_FORMAT(birthdate, '%d.%m.%Y') AS birthdate,
-                   type, is_locked
-            FROM characters WHERE account_id = ?
-        ]], { identifier }, function(rows)
-            rows = rows or {}
-            local characters = {}
-
-            for _, r in ipairs(rows) do
-                characters[#characters + 1] = {
-                    id = r.id,
-                    accountid = r.account_id,   -- <- account_id jetzt mit selektiert
-                    name = r.name,
-                    birthdate = r.birthdate,
-                    type = r.type or 'human',
-                    is_locked = (r.is_locked == 1),
-                    gender = r.gender
-                }
-            end
-
-            local payload = {
-                canCreate = canCreate,
-                maxCharacters = MAX_CHARACTERS,
-                characters = characters,
+        for _, r in ipairs(rows) do
+            characters[#characters + 1] = {
+                id        = r.id,
+                accountid = r.account_id,
+                name      = r.name or ("Char #" .. r.id),
+                gender    = r.gender,
+                birthdate = r.birthdate,
+                type      = r.type or 0,
+                is_locked = (r.is_locked == 1)
             }
+        end
 
-            cb(payload)
-        end)
+        local canCreate = (tonumber(accountNewFlag) == 1)
+        if #characters >= MAX_CHARACTERS then
+            canCreate = false
+        end
+
+        cb({
+            canCreate     = canCreate,
+            maxCharacters = MAX_CHARACTERS,
+            characters    = characters
+        }, accountId)
     end)
 end
 
+-- Account + Characters anhand accountId oder Discord finden
+-- cb(payload, resolvedAccountId)
+local function buildPayload(src, rawAccountId, cb)
+    src = tonumber(src)
+    if not src or src <= 0 then
+        return cb({
+            canCreate     = false,
+            maxCharacters = MAX_CHARACTERS,
+            characters    = {}
+        }, nil)
+    end
 
+    -- 1) numeric accountId übergeben?
+    local numericId = tonumber(rawAccountId)
+    if numericId then
+        MySQL.single(
+            "SELECT CAST(`new` AS UNSIGNED) AS new FROM accounts WHERE id = ? LIMIT 1",
+            { numericId },
+            function(acc)
+                if acc then
+                    return loadCharactersForAccount(src, numericId, acc.new, cb)
+                end
 
--- Open for player
-RegisterNetEvent('LCV:charselect:load', function(targetSrc, accountId)
-    -- Auth ruft: TriggerEvent('LCV:charselect:load', src, S.account_id)
-    local src = tonumber(targetSrc) or -1      -- MUSS der Spieler sein, nicht 'source'
-    if src < 1 or not accountId then
-        slog('warn', ('charselect:load missing args (src=%s, accountId=%s)'):format(tostring(src), tostring(accountId)))
+                -- Fallback über Discord
+                local discordId = getDiscordId(src)
+                if not discordId then
+                    slog("warn", ("buildPayload: no account for id=%s / no discord for %s")
+                        :format(tostring(rawAccountId), tostring(src)))
+                    return cb({
+                        canCreate     = false,
+                        maxCharacters = MAX_CHARACTERS,
+                        characters    = {}
+                    }, nil)
+                end
+
+                MySQL.single(
+                    "SELECT id, CAST(`new` AS UNSIGNED) AS new FROM accounts WHERE discord_id = ? LIMIT 1",
+                    { discordId },
+                    function(acc2)
+                        if not acc2 then
+                            return cb({
+                                canCreate     = true,
+                                maxCharacters = MAX_CHARACTERS,
+                                characters    = {}
+                            }, nil)
+                        end
+                        loadCharactersForAccount(src, acc2.id, acc2.new, cb)
+                    end
+                )
+            end
+        )
         return
     end
-    buildPayload(src,accountId, function(payload)
-        TriggerClientEvent('LCV:charselect:show', src, payload,accountId)
-        SetPlayerRoutingBucket(targetSrc, accountId)
-        slog('info', ('CharSelect sent to %s (account=%s, chars=%d, canCreate=%s)'):
-            format(GetPlayerName(src) or src, tostring(accountId), #(payload.characters or {}), payload.canCreate))
+
+    -- 2) Kein numeric accountId -> über Discord
+    local discordId = getDiscordId(src)
+    if not discordId then
+        slog("warn", ("buildPayload: no valid accountId and no discord for %s"):format(tostring(src)))
+        return cb({
+            canCreate     = false,
+            maxCharacters = MAX_CHARACTERS,
+            characters    = {}
+        }, nil)
+    end
+
+    MySQL.single(
+        "SELECT id, CAST(`new` AS UNSIGNED) AS new FROM accounts WHERE discord_id = ? LIMIT 1",
+        { discordId },
+        function(acc)
+            if not acc then
+                return cb({
+                    canCreate     = true,
+                    maxCharacters = MAX_CHARACTERS,
+                    characters    = {}
+                }, nil)
+            end
+
+            loadCharactersForAccount(src, acc.id, acc.new, cb)
+        end
+    )
+end
+
+-- Charselect öffnen (vom Auth oder Editor)
+RegisterNetEvent("LCV:charselect:load", function(targetSrc, accountId)
+    local eventSource = source
+    local src = tonumber(eventSource) or 0
+
+    -- Wenn von Server intern (TriggerEvent) aufgerufen: targetSrc enthält Spieler-ID
+    if src == 0 and targetSrc ~= nil then
+        local t = tonumber(targetSrc)
+        if t and t > 0 then
+            src = t
+        end
+    end
+
+    if src <= 0 then
+        slog("warn", ("charselect:load invalid src (source=%s target=%s)")
+            :format(tostring(eventSource), tostring(targetSrc)))
+        return
+    end
+
+    buildPayload(src, accountId, function(payload, resolvedAccountId)
+        resolvedAccountId = resolvedAccountId or accountId
+
+        TriggerClientEvent("LCV:charselect:show", src, payload, resolvedAccountId)
+
+        if resolvedAccountId then
+            SetPlayerRoutingBucket(src, resolvedAccountId)
+        end
+
+        slog("info", ("CharSelect opened for %s (acc=%s chars=%d canCreate=%s)")
+            :format(
+                GetPlayerName(src) or src,
+                tostring(resolvedAccountId),
+                #(payload.characters or {}),
+                tostring(payload.canCreate)
+            ))
     end)
 end)
 
--- Create character
-RegisterNetEvent('LCV:charselect:create', function()
-    local src = source
-    local identifier = getIdentifier(src)
+-- Reload aus Client (optional)
+RegisterNetEvent("LCV:charselect:reload", function()
+    local src = tonumber(source) or 0
+    if src <= 0 then
+        return
+    end
 
-    exports.oxmysql:fetch("SELECT COUNT(*) AS c FROM characters WHERE account_id = ?", { identifier }, function(rows)
-        local count = rows and rows[1] and (rows[1].c or 0) or 0
-        local hasAce = (not SHOW_PLUS_REQUIRES_ACE) or IsPlayerAceAllowed(src, 'LCV.char.create')
-        if count >= MAX_CHARACTERS or not hasAce then
-            TriggerClientEvent('ox_lib:notify', src, { type='error', description='Keine freien Charakter-Slots.' })
-            slog('warn', ('Create denied for %s (count=%d, ace=%s)'):format(GetPlayerName(src), count, tostring(hasAce)))
-            return
-        end
+    buildPayload(src, nil, function(payload, resolvedAccountId)
+        TriggerClientEvent("LCV:charselect:show", src, payload, resolvedAccountId)
 
-        exports.oxmysql:insert("INSERT INTO characters (account_id, firstname, lastname, birthdate, status, char_type, is_locked) VALUES (?, 'Vorname', 'Nachname', CURDATE(), 'normal', 'human', 0)", { identifier }, function(newId)
-            slog('info', ('Created placeholder char %s for %s'):format(tostring(newId), GetPlayerName(src)))
-            buildPayload(src, function(payload)
-                TriggerClientEvent('LCV:charselect:show', src, payload)
-            end)
-        end)
+        slog("info", ("CharSelect reload for %s (acc=%s chars=%d canCreate=%s)")
+            :format(
+                GetPlayerName(src) or src,
+                tostring(resolvedAccountId),
+                #(payload.characters or {}),
+                tostring(payload.canCreate)
+            ))
     end)
 end)
 
--- Select character
-RegisterNetEvent('LCV:charselect:selected', function(charId)
-    local src = source
-    local identifier = getIdentifier(src)
-    slog('info', ('Selected char ID %d'):format(charId))
-    exports.oxmysql:fetch("SELECT id, firstname, lastname, status, is_locked FROM characters WHERE id = ? AND account_id = ? LIMIT 1", { charId, identifier }, function(rows)
-        if not rows or not rows[1] then
-            TriggerClientEvent('ox_lib:notify', src, { type='error', description='Ungültiger Charakter.' })
-            slog('warn', ('Invalid char select by %s (id=%s)'):format(GetPlayerName(src), tostring(charId)))
+-- NUI schließen
+RegisterNetEvent("LCV:charselect:close", function()
+    local src = tonumber(source) or 0
+    if src > 0 then
+        TriggerClientEvent("LCV:charselect:close", src)
+    end
+end)
+
+-- Charakter auswählen
+RegisterNetEvent("LCV:charselect:select", function(charId)
+    local src = tonumber(source) or 0
+    if src <= 0 then return end
+
+    local id = tonumber(charId)
+    if not id then
+        TriggerClientEvent("ox_lib:notify", src, {
+            type = "error",
+            description = "Ungültige Charakter-ID."
+        })
+        return
+    end
+
+    MySQL.single([[
+        SELECT id, account_id, is_locked
+        FROM characters
+        WHERE id = ?
+        LIMIT 1
+    ]], { id }, function(row)
+        if not row then
+            TriggerClientEvent("ox_lib:notify", src, {
+                type = "error",
+                description = "Ungültiger Charakter."
+            })
             return
         end
-        local row = rows[1]
+
         if row.is_locked == 1 then
-            TriggerClientEvent('ox_lib:notify', src, { type='error', description='Dieser Charakter ist gesperrt.' })
+            TriggerClientEvent("ox_lib:notify", src, {
+                type = "error",
+                description = "Dieser Charakter ist gesperrt."
+            })
             return
         end
-        TriggerClientEvent('LCV:charselect:close', src)
-        -- TriggerEvent('LCV:charselect:spawn', src, row.id) -- hook for your spawn logic
-        slog('info', ('Selected char %d for %s'):format(row.id, GetPlayerName(src)))
+
+        TriggerClientEvent("LCV:charselect:close", src)
+
+        -- hier hängst du dein Spawn-System dran
+        TriggerEvent("LCV:charselect:spawn", src, row.id)
+
+        slog("info", ("Selected char %d for %s")
+            :format(id, GetPlayerName(src) or src))
     end)
+end)
+
+AddEventHandler("playerDropped", function()
+    -- optional: cleanup / bucket reset etc.
 end)
