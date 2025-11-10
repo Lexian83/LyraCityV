@@ -1177,3 +1177,44 @@ body {
   opacity: 0.5;
   font-size: 8px;
 }
+.duty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: #111820;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.duty-info {
+  display: flex;
+  flex-direction: column;
+}
+.duty-label {
+  font-weight: 600;
+}
+.duty-name {
+  opacity: 0.6;
+}
+.duty-status.on {
+  color: #4caf50;
+  font-weight: 600;
+}
+.duty-status.off {
+  color: #f44336;
+  font-weight: 600;
+}
+.duty-toggle-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #1e88e5;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+}
+.duty-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

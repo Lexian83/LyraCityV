@@ -2,6 +2,7 @@ Vue.component("tab-home", {
   props: ["identity"],
   data() {
     return {
+      // Quick Admin Toggles
       toggles: {
         noclip: false,
         godmode: false,
@@ -17,9 +18,9 @@ Vue.component("tab-home", {
       error: null,
 
       // Duty UI
-      dutyFactions: [], // Fraktionen (duty_required) in denen der aktuelle Char Mitglied ist
+      dutyFactions: [], // Fraktionen (duty_required = 1), in denen der aktuelle Char Mitglied ist
       dutyCurrent: [], // Fraktionen, in denen dieser Char aktuell on duty ist
-      dutySelected: "", // ausgewählte Faction-ID fürs Dropdown
+      dutySelected: "", // gewählte Faction-ID für Einstempeln/Ausstempeln
       dutyBusy: false,
       dutyError: null,
     };
@@ -79,7 +80,7 @@ Vue.component("tab-home", {
             body: JSON.stringify({}),
           }
         );
-        const json = await res.json();
+        const json = await res.json().catch(() => null);
         if (!json || !json.ok) return;
 
         this.toggles.noclip = !!json.noclip;
@@ -117,10 +118,11 @@ Vue.component("tab-home", {
       }
     },
 
-    // ====== DUTY HANDLING ======
+    // ====== DUTY: LADEN ======
 
     async syncDuty() {
       this.dutyError = null;
+
       try {
         const res = await fetch(
           `https://${this.getResName()}/LCV:ADMIN:Home:GetDutyData`,
@@ -132,6 +134,7 @@ Vue.component("tab-home", {
             body: JSON.stringify({}),
           }
         );
+
         const json = await res.json().catch(() => null);
 
         if (!json || json.ok === false) {
@@ -141,10 +144,24 @@ Vue.component("tab-home", {
           return;
         }
 
-        this.dutyFactions = json.dutyFactions || [];
-        this.dutyCurrent = json.currentDuty || [];
+        this.dutyFactions = Array.isArray(json.dutyFactions)
+          ? json.dutyFactions
+          : [];
+        this.dutyCurrent = Array.isArray(json.currentDuty)
+          ? json.currentDuty
+          : [];
 
-        // Autoselect, falls nichts gewählt ist und es nur eine Option gibt
+        // Falls aktuelle Auswahl nicht mehr gültig ist -> zurücksetzen
+        if (
+          this.dutySelected &&
+          !this.dutyFactions.some(
+            (f) => String(f.id) === String(this.dutySelected)
+          )
+        ) {
+          this.dutySelected = "";
+        }
+
+        // Autoselect, wenn nichts gewählt & genau eine Faction
         if (!this.dutySelected && this.dutyFactions.length === 1) {
           this.dutySelected = String(this.dutyFactions[0].id);
         }
@@ -155,6 +172,8 @@ Vue.component("tab-home", {
         this.dutyCurrent = [];
       }
     },
+
+    // ====== DUTY: SETZEN ======
 
     async setDuty(on) {
       if (!this.dutySelected || this.dutyBusy) return;
@@ -178,19 +197,27 @@ Vue.component("tab-home", {
         );
 
         const json = await res.json().catch(() => null);
+
         if (!json || json.ok === false) {
           throw new Error(
             (json && json.error) || "Duty konnte nicht gesetzt werden."
           );
         }
 
-        this.dutyCurrent = json.currentDuty || [];
+        // Server sendet dutyFactions + currentDuty zurück → direkt übernehmen
+        if (Array.isArray(json.dutyFactions)) {
+          this.dutyFactions = json.dutyFactions;
+        }
+
+        this.dutyCurrent = Array.isArray(json.currentDuty)
+          ? json.currentDuty
+          : [];
       } catch (e) {
         console.error("[ADMIN][HOME] setDuty error:", e);
         this.dutyError = e.message || e;
       } finally {
         this.dutyBusy = false;
-        // sicherheitshalber alles neu holen
+        // Sicherheitshalber alles neu holen
         this.syncDuty();
       }
     },
@@ -222,20 +249,29 @@ Vue.component("tab-home", {
           <div class="duty-panel">
             <h3 style="margin:4px 0 6px;">Dein Duty Status</h3>
 
-            <div v-if="dutyCurrent.length === 0" class="duty-pill duty-off">
-              <span>Du bist aktuell <strong>Off Duty</strong>.</span>
+            <!-- Wenn keine aktuelle Duty-Fraktion -->
+            <div v-if="dutyCurrent.length === 0" class="duty-row">
+              <div class="duty-info">
+                <div class="duty-label">Keine aktive Duty</div>
+                <div class="duty-name">Du bist aktuell Off Duty.</div>
+              </div>
+              <div class="duty-status off">
+                Off Duty
+              </div>
             </div>
 
+            <!-- Aktive Duty-Fraktionen -->
             <div
               v-for="f in dutyCurrent"
-              :key="f.id"
-              class="duty-pill"
+              :key="'curr-' + f.id"
+              class="duty-row"
             >
-              <div class="duty-pill-title">
-                {{ f.label || f.name }}
+              <div class="duty-info">
+                <div class="duty-label">{{ f.label || f.name }}</div>
+                <div class="duty-name">({{ f.name }})</div>
               </div>
-              <div class="duty-pill-sub">
-                ({{ f.name }}) &nbsp;•&nbsp; On Duty
+              <div class="duty-status on">
+                On Duty
               </div>
             </div>
 
@@ -310,18 +346,19 @@ Vue.component("tab-home", {
               <option disabled value="">Fraktion wählen...</option>
               <option
                 v-for="f in dutyFactions"
-                :key="f.id"
+                :key="'sel-' + f.id"
                 :value="String(f.id)"
               >
                 {{ f.label || f.name }} ({{ f.name }})
               </option>
             </select>
 
-            <div class="duty-buttons">
+            <div class="duty-buttons" style="margin-top:6px; display:flex; gap:6px;">
               <button
                 class="home-button"
                 :disabled="!dutySelected || dutyBusy"
                 @click="setDuty(true)"
+                style="flex:1;"
               >
                 Einstempeln
               </button>
@@ -329,6 +366,7 @@ Vue.component("tab-home", {
                 class="home-button danger"
                 :disabled="!dutySelected || dutyBusy"
                 @click="setDuty(false)"
+                style="flex:1;"
               >
                 Ausstempeln
               </button>

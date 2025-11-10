@@ -1153,19 +1153,23 @@ local function getDutyFactionsForChar(charId)
         ORDER BY f.label, f.name
     ]], { charId }) or {}
 
+    for _, f in ipairs(rows) do
+        local ok, on = pcall(function()
+            return exports['factionManager']:IsOnDuty(charId, f.id)
+        end)
+        f.onDuty = (ok and on == true) or false
+    end
+
     return rows
 end
+
 
 local function buildCurrentDutyList(charId, dutyFactions)
     local current = {}
     if not charId or not dutyFactions then return current end
 
     for _, f in ipairs(dutyFactions) do
-        local ok, on = pcall(function()
-            return exports['factionManager']:IsOnDuty(charId, f.id)
-        end)
-
-        if ok and on then
+        if f.onDuty then
             current[#current+1] = {
                 id = f.id,
                 name = f.name,
@@ -1194,10 +1198,11 @@ lib.callback.register('LCV:ADMIN:Home:GetDutyData', function(source, _)
 
     return {
         ok = true,
-        dutyFactions = dutyFactions,
-        currentDuty  = currentDuty
+        dutyFactions = dutyFactions, -- enthält onDuty pro Fraktion
+        currentDuty  = currentDuty   -- reine Liste nur der aktiven
     }
 end)
+
 
 -- ===== CALLBACK: SET DUTY =====
 
@@ -1218,13 +1223,15 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
         return { ok = false, error = 'Ungültige Fraktion.' }
     end
 
+    -- Validieren: ist der Char in dieser Pflicht-Fraktion Mitglied?
     local row = MySQL.single.await([[
-        SELECT f.id, f.name, f.label
+        SELECT f.id
         FROM factions f
         INNER JOIN faction_members m ON m.faction_id = f.id
         WHERE f.id = ?
           AND f.duty_required = 1
           AND m.char_id = ?
+          AND m.active = 1
     ]], { factionId, charId })
 
     if not row then
@@ -1235,16 +1242,19 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
         return exports['factionManager']:SetDuty(charId, factionId, on)
     end)
 
-    if not okSet then
+    if not okSet or not res then
         print('[LCV:ADMIN:Home:SetDuty] Fehler in SetDuty:', res)
         return { ok = false, error = 'Duty konnte nicht gesetzt werden (Log prüfen).' }
     end
 
+    -- Response wie beim GetDutyData, damit das UI sofort aktualisieren kann
     local dutyFactions = getDutyFactionsForChar(charId)
     local currentDuty  = buildCurrentDutyList(charId, dutyFactions)
 
     return {
         ok = true,
-        currentDuty = currentDuty
+        dutyFactions = dutyFactions,
+        currentDuty  = currentDuty
     }
 end)
+
