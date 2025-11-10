@@ -1,0 +1,30 @@
+# ---- Allgemein ----
+*.log
+*.tmp
+*.bak
+*.old
+.DS_Store
+Thumbs.db
+node_modules/
+.cache/
+dist/
+.env
+.env.*
+
+# ---- FiveM spezifisch ----
+server.cfg
+config.json
+*.key
+
+# ---- Ressourcen, die NICHT auf GitHub sollen ----
+resources/[standalone]/[mlo]/
+resources/[standalone]/mlo/
+resources/[maps]/
+resources/[streaming]/
+
+# ---- Lokale Build-Dateien ----
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
