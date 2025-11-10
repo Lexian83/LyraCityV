@@ -58,8 +58,6 @@ function _getMemberWithRank(charId, factionFilter)
         end
     end
 
-    -- Falls ein Charakter mehrere Einträge hat (Multi-Fraktionen):
-    -- nimm den mit dem höchsten Rang-Level.
     baseQuery = baseQuery .. " ORDER BY r.level DESC LIMIT 1"
 
     local row = MySQL.single.await(baseQuery, params)
@@ -128,7 +126,6 @@ local function loadPermissionSchemaFromDB()
     end
 
     if not next(schema) then
-        -- Fallback, falls Tabelle leer oder kaputt
         print('[factionManager] faction_permission_schema leer oder fehlerhaft, nutze Defaults.')
         schema = buildDefaultPermissionSchema()
     else
@@ -138,21 +135,17 @@ local function loadPermissionSchemaFromDB()
     FactionPermissionSchema = schema
 end
 
--- Public export
 function GetFactionPermissionSchema()
     return FactionPermissionSchema
 end
 exports('GetFactionPermissionSchema', GetFactionPermissionSchema)
 
--- Beim Start einmal laden
 CreateThread(function()
     loadPermissionSchemaFromDB()
 end)
 
--- Optional: Reload Command (nur für Konsole / Superadmin)
 RegisterCommand('faction_perms_reload', function(src)
     if src ~= 0 then
-        -- hier kannst du noch deinen Admin-Check oder ACE einbauen
         return
     end
     loadPermissionSchemaFromDB()
@@ -167,11 +160,9 @@ local function debug(msg)
     -- print(('[FactionManager] %s'):format(msg))
 end
 
--- Helper: Source oder Char-ID -> Char-ID
 local function GetCharIdFromSource(srcOrChar)
     if not srcOrChar then return nil end
 
-    -- Wenn als String rein kommt, versuchen in Zahl zu casten
     if type(srcOrChar) ~= 'number' then
         srcOrChar = tonumber(srcOrChar)
         if not srcOrChar then
@@ -179,7 +170,6 @@ local function GetCharIdFromSource(srcOrChar)
         end
     end
 
-    -- Versuche: es ist eine Player-Source -> über playerManager auflösen
     if GetResourceState('playerManager') == 'started' then
         local ok, data = pcall(function()
             return exports['playerManager']:GetPlayerData(srcOrChar)
@@ -190,7 +180,6 @@ local function GetCharIdFromSource(srcOrChar)
         end
     end
 
-    -- Fallback: wir behandeln die Zahl als bereits bekannte Char-ID
     return srcOrChar
 end
 
@@ -223,7 +212,6 @@ local function LoadRanksForFaction(factionId)
     RankCache[factionId] = { byId = {}, byLevel = {} }
 
     for _, r in ipairs(rows) do
-        -- JSON Permissions sicher dekodieren
         if type(r.permissions) == 'string' then
             local ok, decoded = pcall(json.decode, r.permissions)
             r.permissions = ok and decoded or {}
@@ -240,7 +228,6 @@ end
 local function EnsureFactionRanks(factionId)
     local ranks = RankCache[factionId] or LoadRanksForFaction(factionId)
 
-    -- Wenn keine Ränge existieren: Default-Set anlegen
     if not ranks or (next(ranks.byId) == nil) then
         debug(("Erstelle Default-Ränge für Faction %d"):format(factionId))
 
@@ -285,7 +272,6 @@ end
 -- EXPORTS: FETCH
 ----------------------------------------------------------
 
--- Holt alle Fraktionen (mit optionalem Suchstring), inkl. Leader-Name & Member-Anzahl
 function GetAllFactions(search)
     local sql = [[
         SELECT
@@ -330,7 +316,6 @@ exports('GetFactionById', GetFactionById)
 
 function GetFactionByName(name)
     if not name then return nil end
-    -- erst Cache durchsuchen
     for _, f in pairs(FactionCache) do
         if f.name == name then
             return f
@@ -340,7 +325,6 @@ function GetFactionByName(name)
 end
 exports('GetFactionByName', GetFactionByName)
 
--- Gibt die (erste) Fraktion des Chars zurück (klassisch: nur eine Hauptfraktion)
 local function _getPrimaryFactionForChar(charId)
     local rows = MySQL.query.await([[
         SELECT fm.*, f.*, fr.name AS rank_name, fr.level AS rank_level
@@ -360,7 +344,6 @@ local function IsDutyRequiredForFaction(faction)
     return tonumber(faction.duty_required) == 1
 end
 
-
 function GetPlayerFaction(src)
     local charId = GetCharIdFromSource(src) or tonumber(src)
     if not charId then return nil end
@@ -368,7 +351,6 @@ function GetPlayerFaction(src)
 end
 exports('GetPlayerFaction', GetPlayerFaction)
 
--- Für Multi-Faction-Unterstützung (alle Zugehörigkeiten)
 function GetPlayerFactions(src)
     local charId = GetCharIdFromSource(src) or tonumber(src)
     if not charId then return {} end
@@ -428,7 +410,6 @@ function GetFactionRanks(factionId)
 end
 exports('GetFactionRanks', GetFactionRanks)
 
-
 function GetFactionLogs(factionId, limit)
     factionId = tonumber(factionId)
     if not factionId then return {} end
@@ -452,10 +433,9 @@ end
 exports('GetFactionLogs', GetFactionLogs)
 
 ----------------------------------------------------------
--- DUTY (persistent via faction_duty)
+-- DUTY (persistent via faction_duty + Logging)
 ----------------------------------------------------------
 
--- intern: prüft, ob Char in Fraktion ist & duty_required = 1
 local function _canUseDuty(charId, factionId)
     charId = tonumber(charId)
     factionId = tonumber(factionId)
@@ -476,7 +456,19 @@ local function _canUseDuty(charId, factionId)
     return row ~= nil
 end
 
--- intern: schreibt Duty-State in faction_duty
+local function _closeOpenDutyLog(charId, factionId)
+    MySQL.update.await([[
+        UPDATE faction_duty_log
+        SET duty_off = NOW(),
+            duration_seconds = TIMESTAMPDIFF(SECOND, duty_on, NOW())
+        WHERE char_id = ?
+          AND faction_id = ?
+          AND duty_off IS NULL
+        ORDER BY duty_on DESC
+        LIMIT 1
+    ]], { charId, factionId })
+end
+
 local function _setDutyPersistent(charId, factionId, state)
     charId = tonumber(charId)
     factionId = tonumber(factionId)
@@ -485,36 +477,48 @@ local function _setDutyPersistent(charId, factionId, state)
     end
 
     if state then
-        -- doppelte vermeiden
+        -- vorhandene aktive Sessions schließen
+        _closeOpenDutyLog(charId, factionId)
+
+        -- alten Status löschen
         MySQL.update.await([[
             DELETE FROM faction_duty
             WHERE char_id = ?
               AND faction_id = ?
         ]], { charId, factionId })
 
+        -- neuen aktiven Status setzen
         MySQL.insert.await([[
             INSERT INTO faction_duty (char_id, faction_id)
             VALUES (?, ?)
         ]], { charId, factionId })
+
+        -- Log-Eintrag für neue Session
+        MySQL.insert.await([[
+            INSERT INTO faction_duty_log (char_id, faction_id, duty_on)
+            VALUES (?, ?, NOW())
+        ]], { charId, factionId })
     else
+        -- aktiven Status entfernen
         MySQL.update.await([[
             DELETE FROM faction_duty
             WHERE char_id = ?
               AND faction_id = ?
         ]], { charId, factionId })
+
+        -- offene Log-Session schließen
+        _closeOpenDutyLog(charId, factionId)
     end
 
     return true
 end
 
--- PUBLIC: Duty setzen
 function SetDuty(srcOrChar, factionIdOrName, state)
     local charId = GetCharIdFromSource(srcOrChar) or tonumber(srcOrChar)
     if not charId then
         return false, 'no_char'
     end
 
-    -- Fraktion auflösen (ID oder Name)
     local faction
     if type(factionIdOrName) == 'string' and not tonumber(factionIdOrName) then
         faction = GetFactionByName(factionIdOrName)
@@ -525,7 +529,6 @@ function SetDuty(srcOrChar, factionIdOrName, state)
         return false, 'no_faction'
     end
 
-    -- wenn Fraktion keine Duty-Pflicht hat → Duty egal, aber wir erlauben's (für Konsistenz)
     if IsDutyRequiredForFaction(faction) and not _canUseDuty(charId, faction.id) then
         return false, 'not_member_or_not_duty_required'
     end
@@ -541,7 +544,6 @@ function SetDuty(srcOrChar, factionIdOrName, state)
 end
 exports('SetDuty', SetDuty)
 
--- PUBLIC: Prüfen, ob Char für Fraktion on duty ist
 function IsOnDuty(srcOrChar, factionIdOrName)
     local charId = GetCharIdFromSource(srcOrChar) or tonumber(srcOrChar)
     if not charId then return false end
@@ -554,7 +556,6 @@ function IsOnDuty(srcOrChar, factionIdOrName)
     end
     if not faction then return false end
 
-    -- keine Duty-Pflicht => immer "on duty" für Permissions/Checks
     if not IsDutyRequiredForFaction(faction) then
         return true
     end
@@ -571,7 +572,6 @@ function IsOnDuty(srcOrChar, factionIdOrName)
 end
 exports('IsOnDuty', IsOnDuty)
 
--- PUBLIC: Liste aller duty-pflichtigen Fraktionen des Char mit onDuty-Flag
 function GetDutyFactions(srcOrChar)
     local charId = GetCharIdFromSource(srcOrChar) or tonumber(srcOrChar)
     if not charId then return {} end
@@ -606,12 +606,10 @@ function GetDutyFactions(srcOrChar)
 end
 exports('GetDutyFactions', GetDutyFactions)
 
-
 ----------------------------------------------------------
--- PERMISSIONS (bereinigt)
+-- PERMISSIONS
 ----------------------------------------------------------
 
--- Schlanker Helper nur für Permissions, damit wir logisch getrennt bleiben.
 local function _fetchMemberRankSimple(charId, factionId)
     local rows = MySQL.query.await([[
         SELECT fm.*, fr.level, fr.permissions
@@ -651,14 +649,11 @@ function HasFactionPermission(srcOrChar, factionIdOrName, permKey)
     local member = _fetchMemberRankSimple(charId, faction.id)
     if not member then return false end
 
-    -- Duty-Pflicht: wenn gesetzt & nicht on duty -> keine Rechte (außer evtl. ganz oben)
-    -- Duty-Pflicht: wenn gesetzt & nicht on duty -> keine Rechte (außer High-Command)
     if IsDutyRequiredForFaction(faction) then
         if not IsOnDuty(charId, faction.id) and not (tonumber(member.level) >= 100) then
             return false
         end
     end
-
 
     local perms = member.permissions or {}
 
@@ -670,9 +665,7 @@ function HasFactionPermission(srcOrChar, factionIdOrName, permKey)
 end
 exports('HasFactionPermission', HasFactionPermission)
 
-
 function IsFactionLeader(srcOrChar, factionIdOrName, minLevel)
-    -- minLevel = ab welchem Level gilt man als "Leader/High Command"
     minLevel = tonumber(minLevel) or 100
 
     local charId = GetCharIdFromSource(srcOrChar) or tonumber(srcOrChar)
@@ -731,7 +724,6 @@ function HasAnyFactionPermission(srcOrChar, permKey, minLevel)
     for _, m in ipairs(memberships) do
         local lvl = tonumber(m.level) or 0
 
-        -- absolute Bosse dürfen immer, egal ob Flag gesetzt
         if lvl >= 100 then
             return true
         end
@@ -775,7 +767,6 @@ exports('LogFactionAction', LogFactionAction)
 -- EXPORTS: MUTATIONEN
 ----------------------------------------------------------
 
--- Update von Stammdaten einer Fraktion (zentrale Stelle)
 function UpdateFaction(factionId, data)
     factionId = tonumber(factionId)
     if not factionId or not data then
@@ -785,32 +776,27 @@ function UpdateFaction(factionId, data)
     local fields = {}
     local params = {}
 
-    -- Name (Key)
     if data.name and data.name ~= '' then
         fields[#fields+1] = 'name = ?'
         params[#params+1] = data.name
     end
 
-    -- Label
     if data.label ~= nil then
         fields[#fields+1] = 'label = ?'
         params[#params+1] = (data.label ~= '' and data.label) or nil
     end
 
-    -- Beschreibung
     if data.description ~= nil then
         fields[#fields+1] = 'description = ?'
         params[#params+1] = data.description
     end
 
-    -- Leader Character ID
     if data.leader_char_id ~= nil then
         local leaderId = tonumber(data.leader_char_id)
         fields[#fields+1] = 'leader_char_id = ?'
         params[#params+1] = leaderId or nil
     end
 
-    -- Duty-Flag (0/1)
     if data.duty_required ~= nil then
         local duty = data.duty_required
         if duty == true then duty = 1 end
@@ -821,7 +807,6 @@ function UpdateFaction(factionId, data)
         params[#params+1] = duty
     end
 
-    -- Gang-Flag (0/1)
     if data.is_gang ~= nil then
         local gang = data.is_gang
         if gang == true then gang = 1 end
@@ -841,14 +826,13 @@ function UpdateFaction(factionId, data)
 
     local affected = MySQL.update.await(sql, params)
     if (affected or 0) > 0 then
-        LoadFaction(factionId) -- Cache aktualisieren
+        LoadFaction(factionId)
         return true
     end
 
     return false, 'no_change'
 end
 exports('UpdateFaction', UpdateFaction)
-
 
 function CreateFaction(name, label, leaderCharId, description, createdByCharId)
     if not name or name == '' then
@@ -857,14 +841,11 @@ function CreateFaction(name, label, leaderCharId, description, createdByCharId)
 
     name = tostring(name)
 
-    -- 1) Gibt es die Fraktion schon?
     local existingId = MySQL.scalar.await('SELECT id FROM factions WHERE name = ?', { name })
     if existingId then
-        -- Idempotent: wir liefern einfach die bestehende ID zurück
         return tonumber(existingId), 'already_exists'
     end
 
-    -- 2) Insert versuchen (gegen Duplicate & DB-Fehler abgesichert)
     local insertId = nil
     local ok, err = pcall(function()
         insertId = MySQL.insert.await([[
@@ -882,7 +863,6 @@ function CreateFaction(name, label, leaderCharId, description, createdByCharId)
     if not ok then
         local msg = tostring(err or ''):lower()
 
-        -- Falls hier "duplicate entry" kommt (z.B. Doppel-Request / Race):
         if msg:find('duplicate entry') then
             local dupId = MySQL.scalar.await('SELECT id FROM factions WHERE name = ?', { name })
             if dupId then
@@ -895,7 +875,6 @@ function CreateFaction(name, label, leaderCharId, description, createdByCharId)
         return nil, 'db_error'
     end
 
-    -- 3) Fallback: wenn insertId komisch ist, nochmal prüfen
     if not insertId or insertId <= 0 then
         local chkId = MySQL.scalar.await('SELECT id FROM factions WHERE name = ?', { name })
         if chkId then
@@ -906,17 +885,14 @@ function CreateFaction(name, label, leaderCharId, description, createdByCharId)
 
     insertId = tonumber(insertId)
 
-    -- 4) Cache aktualisieren
     local rows = MySQL.query.await('SELECT * FROM factions WHERE id = ?', { insertId })
     local faction = rows and rows[1]
     if faction then
         FactionCache[insertId] = faction
     end
 
-    -- 5) Default-Ränge anlegen
     EnsureFactionRanks(insertId)
 
-    -- 6) Log + Leader eintragen (falls gesetzt)
     LogFactionAction(insertId, createdByCharId or leaderCharId, nil, 'create_faction', {
         name = name,
         label = label or name
@@ -937,13 +913,10 @@ function CreateFaction(name, label, leaderCharId, description, createdByCharId)
 end
 exports('CreateFaction', CreateFaction)
 
-
-
 function DeleteFaction(factionId)
     factionId = tonumber(factionId)
     if not factionId then return false, 'invalid_id' end
 
-    -- CASCADE kümmert sich um Mitglieder/Ränge/Logs
     local affected = MySQL.update.await('DELETE FROM factions WHERE id = ?', { factionId })
     FactionCache[factionId] = nil
     RankCache[factionId] = nil
@@ -960,7 +933,6 @@ function CreateRank(factionId, name, level, permissions)
         return nil, 'invalid_params'
     end
 
-    -- Name bereits vergeben?
     local existsName = MySQL.scalar.await(
         'SELECT id FROM faction_ranks WHERE faction_id = ? AND name = ?',
         { factionId, name }
@@ -969,7 +941,6 @@ function CreateRank(factionId, name, level, permissions)
         return nil, 'name_exists'
     end
 
-    -- Level bereits vergeben?
     local existsLevel = MySQL.scalar.await(
         'SELECT id FROM faction_ranks WHERE faction_id = ? AND level = ?',
         { factionId, level }
@@ -995,7 +966,6 @@ function CreateRank(factionId, name, level, permissions)
         local msg = tostring(err or ''):lower()
 
         if msg:find('duplicate entry') then
-            -- zur Sicherheit nochmal prüfen, welcher Konflikt
             local dupName = MySQL.scalar.await(
                 'SELECT id FROM faction_ranks WHERE faction_id = ? AND name = ?',
                 { factionId, name }
@@ -1028,7 +998,6 @@ function CreateRank(factionId, name, level, permissions)
 end
 exports('CreateRank', CreateRank)
 
-
 function UpdateRankPermissions(rankId, permissions)
     rankId = tonumber(rankId)
     if not rankId then return false, 'invalid_rank' end
@@ -1038,7 +1007,6 @@ function UpdateRankPermissions(rankId, permissions)
         { json.encode(permissions or {}), rankId }
     )
 
-    -- Cache invalidieren (einfach global, klein genug)
     RankCache = {}
     return affected > 0
 end
@@ -1050,7 +1018,6 @@ function UpdateRank(rankId, data)
         return false, 'invalid_params'
     end
 
-    -- Aktuellen Rang laden
     local rows = MySQL.query.await('SELECT * FROM faction_ranks WHERE id = ?', { rankId })
     local current = rows and rows[1]
     if not current then
@@ -1060,7 +1027,6 @@ function UpdateRank(rankId, data)
     local factionId = tonumber(current.faction_id)
     local fields, params = {}, {}
 
-    -- Name ändern + Duplikatcheck
     if data.name and data.name ~= '' and data.name ~= current.name then
         local existsName = MySQL.scalar.await(
             'SELECT id FROM faction_ranks WHERE faction_id = ? AND name = ? AND id <> ?',
@@ -1073,7 +1039,6 @@ function UpdateRank(rankId, data)
         params[#params+1] = data.name
     end
 
-    -- Level ändern + Duplikatcheck
     if data.level and tonumber(data.level) ~= tonumber(current.level) then
         local newLevel = tonumber(data.level) or 1
         local existsLevel = MySQL.scalar.await(
@@ -1087,7 +1052,6 @@ function UpdateRank(rankId, data)
         params[#params+1] = newLevel
     end
 
-    -- Permissions setzen
     if data.permissions then
         fields[#fields+1] = 'permissions = ?'
         params[#params+1] = json.encode(data.permissions or {})
@@ -1110,14 +1074,12 @@ function UpdateRank(rankId, data)
 end
 exports('UpdateRank', UpdateRank)
 
-
 function DeleteRank(rankId)
     rankId = tonumber(rankId)
     if not rankId then
         return false, 'invalid_rank'
     end
 
-    -- Check: wird der Rang noch verwendet?
     local inUse = MySQL.scalar.await(
         'SELECT 1 FROM faction_members WHERE rank_id = ? AND active = 1 LIMIT 1',
         { rankId }
@@ -1127,7 +1089,6 @@ function DeleteRank(rankId)
         return false, 'rank_in_use'
     end
 
-    -- Versuch löschen + FK-Fehler abfangen
     local ok, res = pcall(function()
         return MySQL.update.await('DELETE FROM faction_ranks WHERE id = ?', { rankId })
     end)
@@ -1152,8 +1113,6 @@ function DeleteRank(rankId)
 end
 exports('DeleteRank', DeleteRank)
 
-
-
 function AddMember(factionId, charId, rankId)
     factionId = tonumber(factionId)
     charId = tonumber(charId)
@@ -1163,13 +1122,11 @@ function AddMember(factionId, charId, rankId)
         return nil, 'invalid_params'
     end
 
-    -- prüfen ob schon Mitglied
     local existing = MySQL.scalar.await(
         'SELECT id FROM faction_members WHERE faction_id = ? AND char_id = ?',
         { factionId, charId }
     )
     if existing then
-        -- reaktivieren & Rang setzen
         MySQL.update.await(
             'UPDATE faction_members SET rank_id = ?, active = 1 WHERE id = ?',
             { rankId, existing }
@@ -1219,4 +1176,3 @@ function SetMemberRank(factionId, charId, newRankId)
     return affected > 0
 end
 exports('SetMemberRank', SetMemberRank)
-
