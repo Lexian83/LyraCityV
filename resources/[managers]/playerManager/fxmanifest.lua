@@ -1,19 +1,24 @@
 fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
-name 'Manager:Player'
-author 'Lyra & Jens'
-version '1.0.0'
-description 'Holding Playerdata'
 
+name 'playerManager'
+author 'Lyra & Jens'
+version '1.1.0'
+description 'LyraCityV - Player Session & Character Management'
 
 server_scripts {
-  'server/player.lua',
+    '@SQL/server/_bootstrap.lua',
+    '@SQL/server/characters.lua',
+    'server/playerManager.lua',
 }
 
 server_exports {
-  'GetPlayerData'
+    'GetSession',
+    'GetAccountId',
+    'GetActiveCharacterId',
+    'GetPlayerData',
+    'BindAccount',
 }
 
--- Optional Exports, damit andere Ressourcen den Status abfragen können
- -- export 'UI_IsOpen'
+dependency 'SQL'

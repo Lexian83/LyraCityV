@@ -1,207 +1,278 @@
--- Hilfsfunktion: Modell laden
-local function loadModel(hash)
-    if not IsModelInCdimage(hash) or not IsModelValid(hash) then return false end
+-- resources/playerspawn/c-playerspawn.lua
+-- LyraCityV - Einheitlicher Spawn, kompatibel mit PlayerManager + Charakter-Editor
+
+local function log(msg)
+    print(('[LCV:Spawn] %s'):format(tostring(msg)))
+end
+
+local function loadModel(hashOrName)
+    local hash = type(hashOrName) == "number" and hashOrName or GetHashKey(hashOrName)
+    if not IsModelInCdimage(hash) or not IsModelValid(hash) then
+        log(("Ungültiges Modell: %s"):format(tostring(hashOrName)))
+        return nil
+    end
+
     RequestModel(hash)
     local timeout = GetGameTimer() + 5000
-    while not HasModelLoaded(hash) and GetGameTimer() < timeout do
+    while not HasModelLoaded(hash) do
         Wait(0)
-    end
-    return HasModelLoaded(hash)
-end
-
--- Sanfter Spawn nach Auswahl
-RegisterNetEvent('LCV:spawn', function(data)
-    -- normalize critical fields
-data = data or {}
-data.past = tonumber(data.past) or 0
-data.residence_permit = tonumber(data.residence_permit) or 0
-data.clothes = data.clothes or {}
-data.appearances = data.appearances or {}
-
-   -- print('[LCV][charui] spawn event received', data and data.id or 'nil')
-    TriggerEvent('LCV:characterSelectedFinish')
-
-    -- Fade-Out
-    if not IsScreenFadedOut then
-        -- safety: in manchen Builds ist die native nicht gebunden
-        DoScreenFadeOut(500)
-        while not IsScreenFadedOut() do Wait(0) end
-    else
-        if not IsScreenFadedOut() then
-            DoScreenFadeOut(500)
-            while not IsScreenFadedOut() do Wait(0) end
+        if GetGameTimer() > timeout then
+            log("Model-Load Timeout")
+            return nil
         end
     end
 
-    local ped = PlayerPedId()
+    return hash
+end
 
+-- ======= Appearance Helper =======
 
-    -- Freeze & Invincible während Setup
-    FreezeEntityPosition(ped, true)
-    SetEntityInvincible(ped, true)
+local function applyHeadBlend(ped, a)
+    if not a then return end
 
-    -- 1) Free-mode Modell anhand Gender wählen (1 = m, 0 = f)
-    local modelName = (tonumber(data.gender) == 1) and 'mp_m_freemode_01' or 'mp_f_freemode_01'
-    local modelHash = joaat(modelName)
-    -- 2) Modell wechseln (falls nötig) VOR dem Teleport, während Fade-Out
+    -- Editor-Varianten unterstützen
+    local faceFather = a.faceFather or a.faceF or 0
+    local faceMother = a.faceMother or a.faceM or 0
+    local skinFather = a.skinFather or faceFather
+    local skinMother = a.skinMother or faceMother
 
-        if loadModel(modelHash) then
-            ClearPedTasksImmediately(ped)
-            RemoveAllPedWeapons(ped, true)
-            SetEntityVisible(ped, false, false)
+    local faceMix = a.faceMix or 0.5
+    local skinMix = a.skinMix or faceMix
 
-            SetPlayerModel(PlayerId(), modelHash)
-            ped = PlayerPedId() -- nach SetPlayerModel neu referenzieren
-
-            -- Standard-Variationen, keine Props
-            SetPedDefaultComponentVariation(ped)
-            ClearAllPedProps(ped)
-
-
-            -- FACIAL etc..    
-            local tempData = data.appearances
--- Reset
-    ClearPedBloodDamage(ped)
-    ClearPedDecorations(ped)
-    -- Head blend reset auf definierte Basis, dann setzen
-    SetPedHeadBlendData(ped, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0, false)
-
-    -- Head blend
     SetPedHeadBlendData(
         ped,
-        tempData.faceFather or 0,
-        tempData.faceMother or 0,
+        faceFather,
+        faceMother,
         0,
-        tempData.skinFather or 0,
-        tempData.skinMother or 0,
+        skinFather,
+        skinMother,
         0,
-        tonumber(tempData.faceMix or 0.0) or 0.0,
-        tonumber(tempData.skinMix or 0.0) or 0.0,
-        0,
+        faceMix,
+        skinMix,
+        0.0,
         false
     )
-
-    -- Facial features
-    if tempData.structure then
-        for i = 1, #tempData.structure do
-            SetPedFaceFeature(ped, i - 1, tempData.structure[i] or 0.0)
-        end
-    end
-
-    -- Overlays (ohne Farben)
-    if tempData.opacityOverlays then
-        for i = 1, #tempData.opacityOverlays do
-            local ov = tempData.opacityOverlays[i]
-            if ov then
-                SetPedHeadOverlay(ped, ov.id or 0, ov.value or 0, tonumber(ov.opacity or 1.0) or 1.0)
-            end
-        end
-    end
-
-    -- Hair
-    if tempData.hairOverlay then
-        local collection = GetHashKey(tempData.hairOverlay.collection or '')
-        local overlay = GetHashKey(tempData.hairOverlay.overlay or '')
-        AddPedDecorationFromHashes(ped, collection, overlay)
-    end
-    SetPedComponentVariation(ped, 2, tempData.hair or 0, 0, 0)
-    SetPedHairColor(ped, tempData.hairColor1 or 0, tempData.hairColor2 or 0)
-
-    -- Facial Hair
-    SetPedHeadOverlay(ped, 1, tempData.facialHair or 0, tempData.facialHairOpacity or 0.0)
-    SetPedHeadOverlayColor(ped, 1, 1, tempData.facialHairColor1 or 0, tempData.facialHairColor1 or 0)
-
-    -- Eyebrows
-    SetPedHeadOverlay(ped, 2, tempData.eyebrows or 0, 1.0)
-    SetPedHeadOverlayColor(ped, 2, 1, tempData.eyebrowsColor1 or 0, tempData.eyebrowsColor1 or 0)
-
-    -- Color Overlays (Makeup etc.)
-    if tempData.colorOverlays then
-        for i = 1, #tempData.colorOverlays do
-            local ov = tempData.colorOverlays[i]
-            if ov then
-                local c2 = ov.color2 or ov.color1 or 0
-                SetPedHeadOverlay(ped, ov.id or 0, ov.value or 0, tonumber(ov.opacity or 1.0) or 1.0)
-                SetPedHeadOverlayColor(ped, ov.id or 0, 1, ov.color1 or 0, c2 or 0)
-            end
-        end
-    end
-
-    -- Eyes
-    if tempData.eyes then
-        SetPedEyeColor(ped, tempData.eyes)
-    end
--- print(('[SPAWN]Torso ID: %s | tonumber: %s | UNDERSHIRT: %s'):format(data.clothes.torso, tonumber(data.clothes.torso), data.clothes.undershirt))
-
-            -- Clothes
-
-                SetPedComponentVariation(ped, 11, data.clothes.top, data.clothes.topcolor, 0) -- Jacke/Top
-                SetPedComponentVariation(ped, 3,  data.clothes.torso, 0, 0) -- Torso
-                SetPedComponentVariation(ped, 4,  data.clothes.pants, data.clothes.pantsColor, 0) -- Hose
-                SetPedComponentVariation(ped, 6,  data.clothes.shoes, data.clothes.shoesColor, 0) -- Schuhe
-                SetPedComponentVariation(ped, 8,  data.clothes.undershirt, data.clothes.undershirtColor, 0) -- Unterhemd
-   
-
-            ResetPedMovementClipset(ped, 0.0)
-            ResetPedWeaponMovementClipset(ped)
-            ResetPedStrafeClipset(ped)
-            SetPedArmour(ped, 0)
-            SetPedCanLosePropsOnDamage(ped, false, 0)
-            SetModelAsNoLongerNeeded(modelHash)
-            SetEntityVisible(ped, true, false)
-        else
-           -- print(('[LCV][charui] WARN: Model %s konnte nicht geladen werden, verwende aktuelles.'):format(modelName))
-        end
-  
-
-    -- past: 0 = Zivi | 1 = Crime
-    -- residence_permit:  0 = kein Visum | 1 = Vorläufig | 2 = Bürger
-
-local x = 0
-local y = 0
-local z = 0
-local heading = 0
-
--- print(('[LCV][charui] PAST: %s | Residence Permit: %s'):format(data.past, data.residence_permit))
-if (data.residence_permit >= 1 ) then -- Normaler Spawn
-    -- 3) Koordinaten vorbereiten (+ Fallback)
-    x = tonumber(data and data.pos and data.pos.x) or 0.0
-    y = tonumber(data and data.pos and data.pos.y) or 0.0
-    z = tonumber(data and data.pos and data.pos.z) or 0.0
-    heading = tonumber(data and data.heading or 0.0) or 0.0
-elseif(data.residence_permit == 0 and data.past == 0) then -- Zivil Spawn Airport
-x, y, z, heading = -1111.24, -2843.37, 14.89, 267.78
-elseif(data.residence_permit == 0 and data.past == 1) then -- Crime Spawn Jail
-x, y, z, heading = 1690.70, 2606.72, 45.56, 281.05
 end
 
+local function applyFaceFeatures(ped, a)
+    if not a or not a.structure then return end
+    for i = 1, #a.structure do
+        local val = a.structure[i]
+        if val ~= nil then
+            SetPedFaceFeature(ped, i - 1, val + 0.0)
+        end
+    end
+end
 
-    if ShutdownLoadingScreen then ShutdownLoadingScreen() end
-    if ShutdownLoadingScreenNui then ShutdownLoadingScreenNui() end
+local function applyOverlays(ped, a)
+    if not a then return end
 
-    -- 4) Teleport + Collision
-    SetEntityCoordsNoOffset(ped, x, y, z, false, false, false)
-    SetEntityHeading(ped, heading)
-    -- print(('[LCV][PLAYERSPAWN] X: %s | Y: %s | Z: %s | Heading: %s.'):format(x,y,z,heading))
-    RequestCollisionAtCoord(x, y, z)
-    local timeout = GetGameTimer() + 5000
-    while not HasCollisionLoadedAroundEntity(ped) and GetGameTimer() < timeout do
-        Wait(0)
+    -- Augenfarbe
+    if a.eyes ~= nil then
+        SetPedEyeColor(ped, a.eyes)
     end
 
--- 5) Health setzen (relativ zum echten Max-Health)
-local ped = PlayerPedId()
-local maxH = GetEntityMaxHealth(ped)
-if maxH < 200 then SetPedMaxHealth(ped, 200); maxH = 200 end
+    -- Augenbrauen
+    if a.eyebrows ~= nil then
+        local opacity = a.eyebrowsOpacity or 1.0
+        local color1  = a.eyebrowsColor1 or 0
+        SetPedHeadOverlay(ped, 2, a.eyebrows, opacity)
+        SetPedHeadOverlayColor(ped, 2, 1, color1, color1)
+    end
 
--- Falls du gespeicherte HP aus 'data.health' nutzt, nimm sie – sonst volle HP
-local saved = tonumber(data and data.health)
-local hp = saved and math.max(1, math.min(saved, maxH)) or maxH
+    -- Bart
+    if a.facialHair ~= nil then
+        local opacity = a.facialHairOpacity or 1.0
+        local color1  = a.facialHairColor1 or 0
+        SetPedHeadOverlay(ped, 1, a.facialHair, opacity)
+        SetPedHeadOverlayColor(ped, 1, 1, color1, color1)
+    end
 
-SetEntityHealth(ped, hp)
+    -- Generische Overlays (mit Opacity)
+    if a.opacityOverlays then
+        for _, o in ipairs(a.opacityOverlays) do
+            if o.id and o.value and o.opacity then
+                SetPedHeadOverlay(ped, o.id, o.value, o.opacity)
+            end
+        end
+    end
 
-    -- 6) Unfreeze & Fade-In
+    -- Farbige Overlays
+    if a.colorOverlays then
+        for _, o in ipairs(a.colorOverlays) do
+            if o.id and o.color1 then
+                SetPedHeadOverlayColor(ped, o.id, 1, o.color1 or 0, o.color2 or (o.color1 or 0))
+            end
+        end
+    end
+end
+
+local function applyHair(ped, a)
+    if not a then return end
+
+    -- Frisur
+    local hair = a.hair or a.hairStyle
+    if hair ~= nil then
+        SetPedComponentVariation(ped, 2, hair, 0, 0)
+    end
+
+    -- Haarfarben
+    if a.hairColor1 or a.hairColor2 then
+        SetPedHairColor(ped, a.hairColor1 or 0, a.hairColor2 or (a.hairColor1 or 0))
+    end
+
+    -- Hair-Overlay (Deko)
+    if a.hairOverlay and a.hairOverlay.overlay and a.hairOverlay.collection then
+        local col = GetHashKey(a.hairOverlay.collection)
+        local ov  = GetHashKey(a.hairOverlay.overlay)
+        AddPedDecorationFromHashes(ped, col, ov)
+    end
+end
+
+-- ======= Clothes Helper =======
+
+local function applyClothes(ped, c)
+    c = c or {}
+
+    local function comp(idx, drawable, texture)
+        if drawable ~= nil then
+            SetPedComponentVariation(ped, idx, drawable, texture or 0, 0)
+        end
+    end
+
+    -- Arme
+    if c.torso ~= nil then
+        comp(3, c.torso, 0)
+    end
+
+    -- Undershirt
+    if c.undershirt ~= nil then
+        comp(8, c.undershirt, c.undershirtColor or 0)
+    end
+
+    -- Oberteil
+    if c.top ~= nil then
+        comp(11, c.top, c.topcolor or 0)
+    end
+
+    -- Hosen
+    if c.pants ~= nil then
+        comp(4, c.pants, c.pantsColor or 0)
+    end
+
+    -- Schuhe
+    if c.shoes ~= nil then
+        comp(6, c.shoes, c.shoesColor or 0)
+    end
+end
+
+-- ======= Core Spawn =======
+
+local function spawnPlayer(data)
+    if not data then
+        log("Kein Spawn-Data erhalten.")
+        return
+    end
+
+    -- Kompatible Felder
+    local appearance = data.appearances or data.appearance or {}
+    local clothes    = data.clothes or {}
+
+    -- 🔥 Geschlechtslogik:
+    -- Editor schreibt zuverlässig appearance.sex:
+    --  sex = 0 → weiblich
+    --  sex = 1 → männlich
+    local sex = appearance.sex
+    local gender = data.gender
+
+    local isMale
+
+    if sex ~= nil then
+        isMale = (tonumber(sex) == 1)
+    elseif gender ~= nil then
+        -- Fallback, falls sex nicht vorhanden:
+        -- 0 = weiblich, 1 = männlich (deine DB)
+        isMale = (tonumber(gender) == 1)
+    else
+        -- ganz hartes Fallback
+        isMale = false
+    end
+
+    local modelName = isMale and 'mp_m_freemode_01' or 'mp_f_freemode_01'
+
+    local pos     = data.pos or { x = 0.0, y = 0.0, z = 0.0 }
+    local heading = data.heading or 0.0
+    local dim     = data.dimension or 0
+
+    log(("Spawn %s: isMale=%s | gender=%s | sex=%s")
+        :format(tostring(data.name or "?"), tostring(isMale), tostring(gender), tostring(sex)))
+
+    local modelHash = loadModel(modelName)
+    if not modelHash then
+        log("Konnte gewünschtes Modell nicht laden, versuche mp_m_freemode_01")
+        modelHash = loadModel('mp_m_freemode_01')
+        if not modelHash then
+            log("Fatal: Kein gültiges Model ladbar.")
+            return
+        end
+    end
+
+    local player = PlayerId()
+    local ped    = PlayerPedId()
+
+    -- Dimension übernehmen (Server ist führend, hier nur optisch mitziehen)
+    if dim and dim ~= 0 then
+        SetPlayerRoutingBucket(player, dim)
+    end
+
+    -- Vorbereitung
+    if not IsScreenFadedOut() then
+        DoScreenFadeOut(500)
+        while not IsScreenFadedOut() do Wait(0) end
+    end
+
+    FreezeEntityPosition(ped, true)
+    SetEntityInvincible(ped, true)
+    ClearPedTasksImmediately(ped)
+
+    -- Model setzen
+    SetPlayerModel(player, modelHash)
+    ped = PlayerPedId()
+    SetPedDefaultComponentVariation(ped)
+    ClearAllPedProps(ped)
+    SetModelAsNoLongerNeeded(modelHash)
+
+    -- Position & Heading
+    SetEntityCoordsNoOffset(ped, pos.x + 0.0, pos.y + 0.0, pos.z + 0.0, false, false, false)
+    SetEntityHeading(ped, heading + 0.0)
+
+    -- Clean
+    ClearPedBloodDamage(ped)
+    ClearPedDecorations(ped)
+
+    -- Appearance
+    applyHeadBlend(ped, appearance)
+    applyFaceFeatures(ped, appearance)
+    applyOverlays(ped, appearance)
+    applyHair(ped, appearance)
+
+    -- Clothes
+    applyClothes(ped, clothes)
+
+    -- Health usw.
+    SetEntityHealth(ped, data.health or 200)
+    SetPedArmour(ped, 0)
     FreezeEntityPosition(ped, false)
     SetEntityInvincible(ped, false)
-    DoScreenFadeIn(600)
+
+    DoScreenFadeIn(500)
+
+    log(("Spawn fertig: %s @ (%.2f, %.2f, %.2f)")
+        :format(tostring(data.name or "?"), pos.x or 0.0, pos.y or 0.0, pos.z or 0.0))
+end
+
+-- ======= Event Binding =======
+
+RegisterNetEvent('LCV:spawn', function(data)
+    spawnPlayer(data)
 end)

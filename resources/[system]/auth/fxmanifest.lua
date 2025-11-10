@@ -2,18 +2,17 @@ fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-name 'LyraCityV_auth'
+name 'auth'
 author 'Jens'
-version '0.0.2'
-description 'LyraCityV – Auth & Character (funktional gekapselt, ohne externe SQL-Dateien)'
-
+version '0.0.3'
+description 'LyraCityV – Auth Gateway (Discord + Account-Bindung)'
 
 server_scripts {
-  '@SQL/server/_bootstrap.lua',
-  '@SQL/server/accounts.lua',
-  '@SQL/server/characters.lua',
-  'server/_bootstrap.lua',
-  'server/auth.lua',
+    '@SQL/server/_bootstrap.lua',
+    'server/_bootstrap.lua',
+    'server/auth.lua',
 }
 
-dependency 'logger'
+dependency 'SQL'
+dependency 'accountManager'
+dependency 'playerManager'
