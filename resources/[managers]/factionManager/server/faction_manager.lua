@@ -7,6 +7,82 @@ local DutyState = {}  -- [charId] = { [factionId] = true }
 
 local FactionPermissionSchema = {}
 
+
+---@param charId number          -- Charakter-ID aus der Tabelle `characters`
+---@param factionFilter any      -- optional: faction_id (number) oder faction name (string)
+---@return table|nil
+function _getMemberWithRank(charId, factionFilter)
+    if not charId or tonumber(charId) == nil then
+        return nil
+    end
+
+    local baseQuery = [[
+        SELECT
+            fm.id              AS member_id,
+            fm.faction_id      AS faction_id,
+            fm.char_id         AS char_id,
+            fm.rank_id         AS rank_id,
+            fm.active          AS active,
+
+            f.name             AS faction_name,
+            f.label            AS faction_label,
+            f.duty_required    AS duty_required,
+            f.is_gang          AS is_gang,
+
+            r.name             AS rank_name,
+            r.level            AS rank_level,
+            r.permissions      AS rank_permissions,
+
+            c.name             AS char_name
+        FROM faction_members fm
+        INNER JOIN factions f       ON f.id = fm.faction_id
+        INNER JOIN faction_ranks r  ON r.id = fm.rank_id
+        INNER JOIN characters c     ON c.id = fm.char_id
+        WHERE fm.char_id = ?
+          AND fm.active = 1
+    ]]
+
+    local params = { charId }
+
+    if factionFilter then
+        if type(factionFilter) == "number" then
+            baseQuery = baseQuery .. " AND fm.faction_id = ?"
+            params[#params + 1] = factionFilter
+        elseif type(factionFilter) == "string" then
+            baseQuery = baseQuery .. " AND f.name = ?"
+            params[#params + 1] = factionFilter
+        end
+    end
+
+    -- Falls ein Charakter mehrere Einträge hat (Multi-Fraktionen):
+    -- nimm den mit dem höchsten Rang-Level.
+    baseQuery = baseQuery .. " ORDER BY r.level DESC LIMIT 1"
+
+    local row = MySQL.single.await(baseQuery, params)
+
+    if not row then
+        return nil
+    end
+
+    return {
+        member_id        = row.member_id,
+        char_id          = row.char_id,
+        char_name        = row.char_name,
+
+        faction_id       = row.faction_id,
+        faction_name     = row.faction_name,
+        faction_label    = row.faction_label,
+        duty_required    = row.duty_required == 1,
+        is_gang          = row.is_gang == 1,
+
+        rank_id          = row.rank_id,
+        rank_name        = row.rank_name,
+        rank_level       = row.rank_level,
+        rank_permissions = row.rank_permissions and json.decode(row.rank_permissions) or {}
+    }
+end
+
+
 local function buildDefaultPermissionSchema()
     return {
         manage_faction = { label = 'Fraktion bearbeiten' },
