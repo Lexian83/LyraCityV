@@ -1,4 +1,5 @@
 -- resources/playerManager/server/playerManager.lua
+-- LyraCityV - Player / Character Lifecycle & Autosave
 
 LCV            = LCV or {}
 LCV.Util       = LCV.Util or {}
@@ -6,6 +7,13 @@ LCV.DB         = LCV.DB or {}
 LCV.Characters = LCV.Characters or {}
 
 local json = json
+
+local Session    = {}  -- [src] = { account_id, char_id }
+local PlayerData = {}  -- [src] = { account_id, char_id, character = {...}, clothes = {...}, appearances = {...}, updatedAt }
+
+-- =========================================
+-- Utils
+-- =========================================
 
 local function log(level, msg)
     if LCV.Util and LCV.Util.log then
@@ -15,15 +23,8 @@ local function log(level, msg)
     end
 end
 
--- Session: pro Quelle Account + aktiver Charakter
-local Session    = {}
--- PlayerData: Cache mit vollständigen Daten & Appearance
-local PlayerData = {}
-
--- ========== Helpers ==========
-
-local function safeName(id)
-    return GetPlayerName(id) or ('src:' .. tostring(id))
+local function safeName(src)
+    return GetPlayerName(src) or ('src:' .. tostring(src))
 end
 
 local function toNumberOr(val, default)
@@ -63,62 +64,6 @@ local function sanitizeCharacter(full)
     return full
 end
 
-local function applyDefaultClothes(gender, clothes)
-    clothes = clothes or {}
-    -- Wir setzen NUR Defaults, wenn nichts oder Unsinn drin steht.
-    -- So bleiben existierende Charaktere unverändert.
-
-    local function isEmptyOrNil(v)
-        return v == nil or v == -1
-    end
-
-    if gender == 1 then
-        -- Männlicher Freemode
-        if isEmptyOrNil(clothes.top) then
-            clothes.top      = 11  -- simples Shirt
-            clothes.topcolor = 0
-        end
-        if isEmptyOrNil(clothes.torso) then
-            clothes.torso = 15
-        end
-        if isEmptyOrNil(clothes.pants) then
-            clothes.pants      = 21
-            clothes.pantsColor = 0
-        end
-        if isEmptyOrNil(clothes.shoes) then
-            clothes.shoes      = 34
-            clothes.shoesColor = 0
-        end
-        if isEmptyOrNil(clothes.undershirt) then
-            clothes.undershirt      = 15
-            clothes.undershirtColor = 0
-        end
-    else
-        -- Weiblicher Freemode
-        if isEmptyOrNil(clothes.top) then
-            clothes.top      = 14
-            clothes.topcolor = 0
-        end
-        if isEmptyOrNil(clothes.torso) then
-            clothes.torso = 15
-        end
-        if isEmptyOrNil(clothes.pants) then
-            clothes.pants      = 15
-            clothes.pantsColor = 0
-        end
-        if isEmptyOrNil(clothes.shoes) then
-            clothes.shoes      = 35
-            clothes.shoesColor = 0
-        end
-        if isEmptyOrNil(clothes.undershirt) then
-            clothes.undershirt      = 14
-            clothes.undershirtColor = 0
-        end
-    end
-
-    return clothes
-end
-
 local function buildSpawnData(full)
     full = sanitizeCharacter(full)
     if not full then return nil end
@@ -149,9 +94,6 @@ local function buildSpawnData(full)
     local clothes    = full.clothes or {}
     local appearance = full.appearance or {}
 
-    -- 👉 Hier: Defaults anwenden, wenn neu/leer
-    clothes = applyDefaultClothes(g, clothes)
-
     return {
         id               = full.id,
         name             = full.name,
@@ -178,10 +120,12 @@ local function jenc(v)
     return nil
 end
 
--- ========== Session Binding ==========
+-- =========================================
+-- Session Handling
+-- =========================================
 
 local function bindAccount(src, accountId)
-    src = tonumber(src)
+    src       = tonumber(src)
     accountId = tonumber(accountId)
     if not (src and accountId) then return end
 
@@ -198,13 +142,125 @@ local function clearSession(src)
     PlayerData[src] = nil
 end
 
-AddEventHandler('playerDropped', function()
-    local src = source
-    clearSession(src)
+-- =========================================
+-- Save / Autosave
+-- =========================================
+
+--- Baut einen State für updateState aus PlayerData + aktuellem Ped
+local function buildStateForSave(src)
+    src = tonumber(src)
+    local s  = Session[src]
+    local pd = PlayerData[src]
+
+    if not s or not s.account_id or not s.char_id or not pd then
+        return nil
+    end
+
+    local ped = GetPlayerPed(src)
+    local px, py, pz, heading, dim, health
+
+    if ped and ped ~= 0 then
+        local coords = GetEntityCoords(ped)
+        px, py, pz   = coords.x or coords[1], coords.y or coords[2], coords.z or coords[3]
+        heading      = GetEntityHeading(ped)
+        dim          = GetPlayerRoutingBucket and GetPlayerRoutingBucket(src) or 0
+        health       = GetEntityHealth(ped)
+    end
+
+    local char = pd.character or {}
+
+    local state = {
+        pos = {
+            x = px or char.pos_x or 0.0,
+            y = py or char.pos_y or 0.0,
+            z = pz or char.pos_z or 0.0,
+        },
+        heading   = heading or char.heading or 0.0,
+        dimension = dim or char.dimension or 0,
+        health    = health or char.health or 200,
+        thirst    = char.thirst or 100,
+        food      = char.food or 100,
+        appearance = pd.appearances or char.appearance or {},
+        clothes    = pd.clothes or char.clothes or {},
+    }
+
+    return state
+end
+
+local function saveCharacter(src, reason, cb)
+    src = tonumber(src)
+    local s = Session[src]
+    if not s or not s.account_id or not s.char_id then
+        if cb then cb(false) end
+        return
+    end
+
+    if not (LCV.Characters and LCV.Characters.updateState) then
+        log("ERROR", "LCV.Characters.updateState nicht verfügbar, Autosave übersprungen.")
+        if cb then cb(false) end
+        return
+    end
+
+    local state = buildStateForSave(src)
+    if not state then
+        if cb then cb(false) end
+        return
+    end
+
+    LCV.Characters.updateState(s.char_id, s.account_id, state, function(ok)
+        if ok then
+            log("DEBUG", ("Autosave (%s): src=%s acc=%s char=%s")
+                :format(reason or "auto", src, s.account_id, s.char_id))
+        end
+        if cb then cb(ok and true or false) end
+    end)
+end
+
+-- Export, falls du manuell z.B. für Admin-Tools saven willst
+exports('SaveCharacter', function(src, cb)
+    saveCharacter(src, 'manual-export', cb)
 end)
 
--- ========== Character Selection ==========
+-- Beim Disconnect: erst speichern, dann Session aufräumen
+AddEventHandler('playerDropped', function(reason)
+    local src = source
+    if Session[src] and Session[src].char_id then
+        saveCharacter(src, 'drop', function()
+            clearSession(src)
+        end)
+    else
+        clearSession(src)
+    end
+end)
 
+-- Autosave Loop (Standard: alle 5 Minuten, via convar anpassbar: lcv_autosave_minutes)
+CreateThread(function()
+    local minutes = tonumber(GetConvar('lcv_autosave_minutes', '5')) or 5
+    if minutes < 1 then
+        log("INFO", "Autosave deaktiviert (lcv_autosave_minutes < 1).")
+        return
+    end
+
+    local interval = minutes * 60 * 1000
+    log("INFO", ("Autosave aktiv: alle %d Minuten."):format(minutes))
+
+    while true do
+        Wait(interval)
+        for src, s in pairs(Session) do
+            if s and s.account_id and s.char_id then
+                saveCharacter(src, 'interval')
+            end
+        end
+    end
+end)
+
+-- =========================================
+-- Charakter auswählen
+-- =========================================
+
+-- Unterstützt:
+-- 1) Client direkt: TriggerServerEvent('LCV:Player:SelectCharacter', charId)
+-- 2) Bridge:        TriggerEvent('LCV:Player:SelectCharacter', src, charId)
 RegisterNetEvent('LCV:Player:SelectCharacter', function(a, b)
     local src, charId
 
@@ -216,30 +272,26 @@ RegisterNetEvent('LCV:Player:SelectCharacter', function(a, b)
         charId = tonumber(a)
     end
 
-    if not src or not charId then
-        return
-    end
+    if not src or not charId then return end
 
     local s = Session[src]
     if not s or not s.account_id then
         return TriggerClientEvent('LCV:error', src, "Kein Account gebunden. Bitte neu verbinden.")
     end
 
-    local accountId = s.account_id
-
     if not (LCV.Characters and LCV.Characters.selectOwned and LCV.Characters.getFull) then
         log("ERROR", "LCV.Characters.* nicht definiert. Prüfe SQL-Resource.")
         return
     end
 
-    LCV.Characters.selectOwned(charId, accountId, function(row)
+    LCV.Characters.selectOwned(charId, s.account_id, function(row)
         if not row or not row.id then
             return TriggerClientEvent('LCV:error', src, "Ungültige Charakter-ID oder nicht dein Charakter.")
         end
 
         s.char_id = row.id
 
-        LCV.Characters.getFull(row.id, accountId, function(full)
+        LCV.Characters.getFull(row.id, s.account_id, function(full)
             if not full or not full.id then
                 return TriggerClientEvent('LCV:error', src, "Charakterdaten nicht gefunden.")
             end
@@ -255,7 +307,7 @@ RegisterNetEvent('LCV:Player:SelectCharacter', function(a, b)
             end
 
             PlayerData[src] = {
-                account_id  = accountId,
+                account_id  = s.account_id,
                 char_id     = full.id,
                 character   = full,
                 clothes     = spawnData.clothes,
@@ -273,7 +325,9 @@ RegisterNetEvent('LCV:Player:SelectCharacter', function(a, b)
     end)
 end)
 
--- ========== Character Create / Delete / Rename ==========
+-- =========================================
+-- Create / Delete / Rename
+-- =========================================
 
 RegisterNetEvent('LCV:Player:CreateCharacter', function(data)
     local src = source
@@ -303,7 +357,7 @@ RegisterNetEvent('LCV:Player:CreateCharacter', function(data)
         log("INFO", ("Charakter erstellt: account_id=%s char_id=%s name=%s")
             :format(s.account_id, newId, name))
 
-        TriggerClientEvent('LCV:charCreated', src, { id = newId, name = name })
+        TriggerClientEvent('LCV:charCreated', src, { id = newId, name = name, gender = data.gender or 0 })
     end)
 end)
 
@@ -344,8 +398,8 @@ RegisterNetEvent('LCV:Player:RenameCharacter', function(charId, newName)
         return TriggerClientEvent('LCV:error', src, "Kein Account gebunden.")
     end
 
-    charId   = tonumber(charId)
-    newName  = tostring(newName or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    charId  = tonumber(charId)
+    newName = tostring(newName or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if not charId or #newName < 3 or #newName > 60 then
         return TriggerClientEvent('LCV:error', src, "Ungültige Eingabe.")
     end
@@ -371,8 +425,12 @@ RegisterNetEvent('LCV:Player:RenameCharacter', function(charId, newName)
     end)
 end)
 
--- ========== State Sync / Autosave ==========
+-- =========================================
+-- State Sync / Autosave Input
+-- =========================================
 
+-- Client kann diesen Event regelmäßig schicken (HUD, Movement etc.)
+-- und wir speichern die Daten + nutzen sie beim Autosave.
 RegisterNetEvent('LCV:Player:SyncState', function(state)
     local src = source
     local s = Session[src]
@@ -423,17 +481,11 @@ RegisterNetEvent('LCV:Player:SyncState', function(state)
     end
 
     PlayerData[src] = pd
-
-    if LCV.Characters and LCV.Characters.updateState then
-        LCV.Characters.updateState(s.char_id, s.account_id, state, function(ok)
-            if not ok then
-                log("WARN", ("StateSync DB-Update fehlgeschlagen für src=%s char_id=%s"):format(src, s.char_id))
-            end
-        end)
-    end
 end)
 
--- ========== Legacy PushData (Kompat) ==========
+-- =========================================
+-- Legacy Kompat PushData
+-- =========================================
 
 AddEventHandler('Manager:Player:PushData', function(data)
     data = data or {}
@@ -452,7 +504,9 @@ AddEventHandler('Manager:Player:PushData', function(data)
     log("DEBUG", ("[Compat] PushData für %s (%s) übernommen."):format(safeName(src), src))
 end)
 
--- ========== Exports ==========
+-- =========================================
+-- Exports
+-- =========================================
 
 exports('GetSession', function(src)
     src = tonumber(src)
@@ -495,5 +549,5 @@ exports('RenameCharacter', function(accountId, charId, newName, cb)
         if cb then cb(false) end
         return
     end
-    LCV.Characters.renameOwned(charId, accountId, newName, cb)
+    LCV.Characters.renameOwned(charId, accountId, cb)
 end)
