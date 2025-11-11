@@ -961,7 +961,7 @@ lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
         h.ipl                = tonumber(h.ipl) or nil
         h.lock_state         = (tonumber(h.lock_state) == 1) and 1 or 0
 
-        h.hotel              = tonumber(h.hotel) or 0
+        h.hotel              = tonumber(h.hotel) == 1
         h.apartments         = tonumber(h.apartments) or 0
         h.garage_size        = tonumber(h.garage_size) or 0
 

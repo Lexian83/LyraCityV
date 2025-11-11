@@ -30,9 +30,11 @@ Vue.component("tab-houses", {
         garage_y: null,
         garage_z: null,
         radius: 0.5,
+
         hotel: false,
         apartments: 0,
         garage_size: 0,
+
         allowed_bike: true,
         allowed_motorbike: true,
         allowed_car: true,
@@ -40,6 +42,7 @@ Vue.component("tab-houses", {
         allowed_plane: false,
         allowed_helicopter: false,
         allowed_boat: false,
+
         maxkeys: 0,
         pincode: "",
       },
@@ -69,6 +72,21 @@ Vue.component("tab-houses", {
   },
 
   methods: {
+    // ===== Helper =====
+    toBool(value) {
+      if (typeof value === "boolean") {
+        return value;
+      }
+      if (typeof value === "number") {
+        return value === 1;
+      }
+      if (typeof value === "string") {
+        const v = value.trim().toLowerCase();
+        return v === "1" || v === "true" || v === "yes" || v === "on";
+      }
+      return false;
+    },
+
     composeName(street, number) {
       street = (street || "").trim();
       number = (number || "").trim();
@@ -93,21 +111,7 @@ Vue.component("tab-houses", {
       return "vermietet";
     },
 
-    toBool(v) {
-      if (v === true) return true;
-      if (v === false || v === null || v === undefined) return false;
-      if (typeof v === "number") return v !== 0;
-      if (typeof v === "string") {
-        const s = v.trim().toLowerCase();
-        if (s === "1" || s === "true" || s === "yes" || s === "on") return true;
-        if (s === "0" || s === "false" || s === "no" || s === "off" || s === "")
-          return false;
-      }
-      return !!v;
-    },
-
     // ===== NUI Helper =====
-
     async nuiCall(name, payload = {}) {
       const res = await fetch(`https://${GetParentResourceName()}/${name}`, {
         method: "POST",
@@ -123,7 +127,6 @@ Vue.component("tab-houses", {
     },
 
     // ===== Load =====
-
     async reloadAll() {
       this.loading = true;
       this.error = null;
@@ -146,7 +149,6 @@ Vue.component("tab-houses", {
     },
 
     // ===== Sort =====
-
     setSort(field) {
       if (this.sortField === field) {
         this.sortDir = this.sortDir === "asc" ? "desc" : "asc";
@@ -188,8 +190,7 @@ Vue.component("tab-houses", {
       return list;
     },
 
-    // ===== Placement Mode =====
-
+    // ===== Placement Mode (1/3 Viewport) =====
     async setPlacementMode(enabled) {
       this.placementMode = !!enabled;
       await this.nuiCall("LCV:ADMIN:UI:SetPlacementMode", {
@@ -198,7 +199,6 @@ Vue.component("tab-houses", {
     },
 
     // ===== GET PLAYER POS =====
-
     async getPlayerPos() {
       const res = await this.nuiCall("LCV:ADMIN:Houses:GetPlayerPos");
       if (!res.ok) {
@@ -208,11 +208,12 @@ Vue.component("tab-houses", {
       return { x: res.x, y: res.y, z: res.z };
     },
 
-    // ===== Add =====
-
+    // ===== Add House (INLINE) =====
     startAdd() {
+      // Nur ein Formular aktiv
       this.editDialog.visible = false;
       this.deleteConfirm.visible = false;
+
       this.addMode = true;
       this.addError = null;
       this.setPlacementMode(true);
@@ -234,9 +235,11 @@ Vue.component("tab-houses", {
         garage_y: null,
         garage_z: null,
         radius: 0.5,
+
         hotel: false,
         apartments: 0,
         garage_size: 0,
+
         allowed_bike: true,
         allowed_motorbike: true,
         allowed_car: true,
@@ -244,6 +247,7 @@ Vue.component("tab-houses", {
         allowed_plane: false,
         allowed_helicopter: false,
         allowed_boat: false,
+
         maxkeys: 0,
         pincode: "",
       };
@@ -303,6 +307,7 @@ Vue.component("tab-houses", {
           return;
         }
 
+        const p = this.addForm;
         const payload = {
           name,
           ownerid: this.addForm.ownerid || null,
@@ -319,16 +324,19 @@ Vue.component("tab-houses", {
           garage_y: this.addForm.garage_y,
           garage_z: this.addForm.garage_z,
           radius: Number(this.addForm.radius) || 0.5,
+
           hotel: this.addForm.hotel ? 1 : 0,
           apartments: Number(this.addForm.apartments) || 0,
           garage_size: Number(this.addForm.garage_size) || 0,
-          allowed_bike: !!this.addForm.allowed_bike,
-          allowed_motorbike: !!this.addForm.allowed_motorbike,
-          allowed_car: !!this.addForm.allowed_car,
-          allowed_truck: !!this.addForm.allowed_truck,
-          allowed_plane: !!this.addForm.allowed_plane,
-          allowed_helicopter: !!this.addForm.allowed_helicopter,
-          allowed_boat: !!this.addForm.allowed_boat,
+
+          allowed_bike: this.addForm.allowed_bike ? 1 : 0,
+          allowed_motorbike: this.addForm.allowed_motorbike ? 1 : 0,
+          allowed_car: this.addForm.allowed_car ? 1 : 0,
+          allowed_truck: this.addForm.allowed_truck ? 1 : 0,
+          allowed_plane: this.addForm.allowed_plane ? 1 : 0,
+          allowed_helicopter: this.addForm.allowed_helicopter ? 1 : 0,
+          allowed_boat: this.addForm.allowed_boat ? 1 : 0,
+
           maxkeys: Number(this.addForm.maxkeys) || 0,
           pincode: this.addForm.pincode || "",
         };
@@ -348,40 +356,50 @@ Vue.component("tab-houses", {
       }
     },
 
-    // ===== Edit =====
-
+    // ===== Edit (INLINE) =====
     openEdit(h) {
       const ns = this.splitName(h.name || "");
 
+      // Nur Edit-Form anzeigen
       this.addMode = false;
       this.deleteConfirm.visible = false;
 
       this.editDialog.visible = true;
       this.editDialog.error = null;
       this.editDialog.busy = false;
+
       this.editDialog.form = {
         id: h.id,
+
+        // Name gesplittet
         streetName: ns.streetName,
         houseNumber: ns.houseNumber,
+
         ownerid: h.ownerid || "",
         price: h.price || 0,
         rent: h.rent || 0,
         ipl: h.ipl || "",
+
         entry_x: h.entry_x,
         entry_y: h.entry_y,
         entry_z: h.entry_z,
+
         garage_trigger_x: h.garage_trigger_x,
         garage_trigger_y: h.garage_trigger_y,
         garage_trigger_z: h.garage_trigger_z,
+
         garage_x: h.garage_x,
         garage_y: h.garage_y,
         garage_z: h.garage_z,
+
         radius: h.radius || 0.5,
 
+        // Hotel & Apartments
         hotel: this.toBool(h.hotel),
         apartments: h.apartments || 0,
         garage_size: h.garage_size || 0,
 
+        // Allowed Vehicles
         allowed_bike: this.toBool(h.allowed_bike),
         allowed_motorbike: this.toBool(h.allowed_motorbike),
         allowed_car: this.toBool(h.allowed_car),
@@ -393,6 +411,7 @@ Vue.component("tab-houses", {
         maxkeys: h.maxkeys || 0,
         pincode: h.pincode || "",
       };
+
       this.setPlacementMode(true);
     },
 
@@ -443,26 +462,33 @@ Vue.component("tab-houses", {
           price: Number(f.price) || 0,
           rent: Number(f.rent) || 0,
           ipl: f.ipl || null,
+
           entry_x: f.entry_x,
           entry_y: f.entry_y,
           entry_z: f.entry_z,
+
           garage_trigger_x: f.garage_trigger_x,
           garage_trigger_y: f.garage_trigger_y,
           garage_trigger_z: f.garage_trigger_z,
+
           garage_x: f.garage_x,
           garage_y: f.garage_y,
           garage_z: f.garage_z,
+
           radius: Number(f.radius) || 0.5,
+
           hotel: f.hotel ? 1 : 0,
           apartments: Number(f.apartments) || 0,
           garage_size: Number(f.garage_size) || 0,
-          allowed_bike: !!f.allowed_bike,
-          allowed_motorbike: !!f.allowed_motorbike,
-          allowed_car: !!f.allowed_car,
-          allowed_truck: !!f.allowed_truck,
-          allowed_plane: !!f.allowed_plane,
-          allowed_helicopter: !!f.allowed_helicopter,
-          allowed_boat: !!f.allowed_boat,
+
+          allowed_bike: f.allowed_bike ? 1 : 0,
+          allowed_motorbike: f.allowed_motorbike ? 1 : 0,
+          allowed_car: f.allowed_car ? 1 : 0,
+          allowed_truck: f.allowed_truck ? 1 : 0,
+          allowed_plane: f.allowed_plane ? 1 : 0,
+          allowed_helicopter: f.allowed_helicopter ? 1 : 0,
+          allowed_boat: f.allowed_boat ? 1 : 0,
+
           maxkeys: Number(f.maxkeys) || 0,
           pincode: f.pincode || "",
         };
@@ -492,23 +518,23 @@ Vue.component("tab-houses", {
     },
 
     // ===== Delete =====
-
     askDelete(h) {
       this.deleteConfirm.visible = true;
       this.deleteConfirm.row = h;
-      this.deleteConfirm.error = null;
       this.deleteConfirm.busy = false;
+      this.deleteConfirm.error = null;
     },
 
     async doDelete() {
       const row = this.deleteConfirm.row;
-      if (!row) return;
-      this.deleteConfirm.busy = true;
+      if (!row || this.deleteConfirm.busy) return;
 
+      this.deleteConfirm.busy = true;
       const res = await this.nuiCall("LCV:ADMIN:Houses:Delete", { id: row.id });
+      this.deleteConfirm.busy = false;
+
       if (!res.ok) {
         this.deleteConfirm.error = res.error || "Fehler beim Löschen.";
-        this.deleteConfirm.busy = false;
         return;
       }
 
@@ -520,12 +546,11 @@ Vue.component("tab-houses", {
     cancelDelete() {
       this.deleteConfirm.visible = false;
       this.deleteConfirm.row = null;
-      this.deleteConfirm.error = null;
       this.deleteConfirm.busy = false;
+      this.deleteConfirm.error = null;
     },
 
     // ===== Teleport & PIN =====
-
     async teleportTo(h) {
       if (!h.entry_x) return;
       await this.nuiCall("LCV:ADMIN:Houses:Teleport", {
@@ -541,380 +566,368 @@ Vue.component("tab-houses", {
         id: h.id,
       });
       if (!res.ok) {
-        alert(
-          "Pincode Reset fehlgeschlagen: " + (res.error || "Unbekannter Fehler")
-        );
+        alert("PIN-Reset fehlgeschlagen: " + (res.error || "?"));
         return;
       }
-
-      this.pinMessage = `PIN von Haus #${h.id} wurde zurückgesetzt.`;
+      this.pinMessage = `Pincode für Haus #${h.id} wurde zurückgesetzt.`;
       setTimeout(() => {
         this.pinMessage = "";
       }, 3000);
-
       await this.reloadAll();
     },
   },
 
   template: `
-    <div class="tab-houses" :class="{ 'placement-mode': placementMode }">
-      <div v-if="loading" class="loading">Lade Häuser...</div>
+    <div class="options">
+      <div class="interaction-header">
+        <h1>Häuser</h1>
+        <div class="header-buttons">
+          <button class="refresh-btn" @click="reloadAll">
+            <i class="fa-solid fa-rotate"></i> Reload
+          </button>
+          <button class="add-btn" @click="startAdd">
+            <i class="fa-solid fa-plus"></i> Neues Haus
+          </button>
+        </div>
+      </div>
 
-      <div v-else class="options">
-        <div class="interaction-header">
-          <div>
-            <strong>Häuserverwaltung</strong>
-            <div class="hint">
-              Verwalte Häuser, Hotels & Garagen. Klick auf "Port" um zum Eingang zu springen.
-            </div>
+      <p class="hint">
+        Verwaltung aller Häuser. Inline-Erstellung/-Bearbeitung, Ansicht skaliert auf 1/3 wie bei Houses_IPL.
+      </p>
+
+      <div v-if="loading" class="status">Lade Häuser ...</div>
+      <div v-else-if="error" class="status error">Fehler: {{ error }}</div>
+
+      <div v-if="pinMessage" class="status success">{{ pinMessage }}</div>
+
+      <div v-else class="table-wrapper">
+        <table v-if="sortedHouses().length" class="table-interactions">
+          <thead>
+            <tr>
+              <th class="sortable" @click="setSort('id')">
+                ID <span class="sort-indicator">{{ sortIndicator('id') }}</span>
+              </th>
+              <th class="sortable" @click="setSort('name')">
+                Name <span class="sort-indicator">{{ sortIndicator('name') }}</span>
+              </th>
+              <th class="sortable" @click="setSort('ownerid')">
+                Owner <span class="sort-indicator">{{ sortIndicator('ownerid') }}</span>
+              </th>
+              <th class="sortable" @click="setSort('status')">
+                Status <span class="sort-indicator">{{ sortIndicator('status') }}</span>
+              </th>
+              <th>Preis</th>
+              <th>Miete</th>
+              <th>Hotel</th>
+              <th>Apts</th>
+              <th class="col-actions">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="h in sortedHouses()" :key="h.id">
+              <td>{{ h.id }}</td>
+              <td class="data-cell">{{ h.name }}</td>
+              <td>{{ h.ownerid || '-' }}</td>
+              <td>{{ statusOf(h) }}</td>
+              <td>{{ h.price || 0 }}</td>
+              <td>{{ h.rent || 0 }}</td>
+              <td>{{ toBool(h.hotel) ? 'Ja' : '-' }}</td>
+              <td>{{ h.apartments || 0 }}</td>
+              <td>
+                <div class="actions">
+                  <button class="btn-icon" @click="teleportTo(h)" title="Teleport">
+                    <i class="fas fa-location-arrow"></i>
+                  </button>
+                  <button class="btn-icon" @click="openEdit(h)" title="Bearbeiten">
+                    <i class="fas fa-pen"></i>
+                  </button>
+                  <button class="btn-icon danger" @click="askDelete(h)" title="Löschen">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  <button class="btn-icon" @click="resetPincode(h)" title="PIN zurücksetzen">
+                    <i class="fas fa-key"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="sortedHouses().length === 0">
+              <td colspan="9" class="hint">Noch keine Häuser angelegt.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- INLINE ADD FORM -->
+      <div v-if="addMode" class="add-form">
+        <h2>Neues Haus anlegen</h2>
+
+        <!-- Zeile 1 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Straßenname</label>
+            <input v-model="addForm.streetName" />
           </div>
-          <div class="header-buttons">
-            <button class="add-btn" @click="startAdd" v-if="!addMode && !editDialog.visible">
-              <span>+ Haus anlegen</span>
+          <div class="field">
+            <label>Hausnummer</label>
+            <input v-model="addForm.houseNumber" />
+          </div>
+          <div class="field">
+            <label>Straßenname von Pos</label>
+            <button class="pos-btn" type="button" @click="getStreetNameFromPlayer">
+              Straßenname
             </button>
           </div>
         </div>
 
-        <div v-if="error" class="error">{{ error }}</div>
-        <div v-if="pinMessage" class="status">{{ pinMessage }}</div>
-
-        <div class="table-wrapper">
-          <table class="table-interactions">
-            <thead>
-              <tr>
-                <th class="sortable" @click="setSort('id')">
-                  ID <span class="sort-indicator">{{ sortIndicator('id') }}</span>
-                </th>
-                <th class="sortable" @click="setSort('name')">
-                  Name <span class="sort-indicator">{{ sortIndicator('name') }}</span>
-                </th>
-                <th class="sortable" @click="setSort('ownerid')">
-                  Owner <span class="sort-indicator">{{ sortIndicator('ownerid') }}</span>
-                </th>
-                <th class="sortable" @click="setSort('status')">
-                  Status <span class="sort-indicator">{{ sortIndicator('status') }}</span>
-                </th>
-                <th>Preis</th>
-                <th>Miete</th>
-                <th>Hotel</th>
-                <th>Apts</th>
-                <th class="col-actions">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="h in sortedHouses()" :key="h.id">
-                <td>{{ h.id }}</td>
-                <td class="data-cell">{{ h.name }}</td>
-                <td>{{ h.ownerid || '-' }}</td>
-                <td>{{ statusOf(h) }}</td>
-                <td>{{ h.price || 0 }}</td>
-                <td>{{ h.rent || 0 }}</td>
-                <td>{{ h.hotel == 1 ? 'Ja' : '-' }}</td>
-                <td>{{ h.apartments || 0 }}</td>
-                <td>
-                  <div class="actions">
-                    <button class="btn-icon" @click="teleportTo(h)" title="Teleport">
-                      <i class="fas fa-location-arrow"></i>
-                    </button>
-                    <button class="btn-icon" @click="openEdit(h)" title="Bearbeiten">
-                      <i class="fas fa-pen"></i>
-                    </button>
-                    <button class="btn-icon danger" @click="askDelete(h)" title="Löschen">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                    <button class="btn-icon" @click="resetPincode(h)" title="PIN reset">
-                      <i class="fas fa-key"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="sortedHouses().length === 0">
-                <td colspan="9" class="hint">Noch keine Häuser angelegt.</td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Zeile 2 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Miete</label>
+            <input v-model.number="addForm.rent" type="number" />
+          </div>
+          <div class="field">
+            <label>Preis</label>
+            <input v-model.number="addForm.price" type="number" />
+          </div>
+          <div class="field">
+            <label>IPL</label>
+            <select v-model="addForm.ipl">
+              <option value="">- kein -</option>
+              <option v-for="i in ipls" :key="i.id" :value="i.id">
+                {{ i.id }} - {{ i.ipl_name }}
+              </option>
+            </select>
+          </div>
         </div>
 
-        <!-- ADD FORM INLINE -->
-        <div v-if="addMode" class="add-form">
-          <h2>Neues Haus anlegen</h2>
-
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Straßenname</label>
-              <input v-model="addForm.streetName" />
-            </div>
-            <div class="field">
-              <label>Hausnummer</label>
-              <input v-model="addForm.houseNumber" />
-            </div>
-            <div class="field">
-              <label>Set from Pos</label>
-              <button class="pos-btn" type="button" @click="getStreetNameFromPlayer">
-                Straßenname
-              </button>
+        <!-- Zeile 3 -->
+        <div class="form-row cols-2">
+          <div class="field">
+            <label>Hotel</label>
+            <div class="switch" :class="{ on: !!addForm.hotel }"
+                 @click="addForm.hotel = !addForm.hotel">
+              <div class="knob"></div>
             </div>
           </div>
-
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Miete</label>
-              <input v-model.number="addForm.rent" type="number" />
-            </div>
-            <div class="field">
-              <label>Preis</label>
-              <input v-model.number="addForm.price" type="number" />
-            </div>
-            <div class="field">
-              <label>IPL</label>
-              <select v-model="addForm.ipl">
-                <option value="">- kein -</option>
-                <option v-for="i in ipls" :key="i.id" :value="i.id">
-                  {{ i.id }} - {{ i.ipl_name }}
-                </option>
-              </select>
-            </div>
+          <div class="field">
+            <label>Apartments</label>
+            <input v-model.number="addForm.apartments" type="number" min="0" />
           </div>
+        </div>
 
-          <div class="form-row cols-2">
-            <div class="field">
-              <label>Hotel</label>
-              <div class="switch" :class="{ on: addForm.hotel }" @click="addForm.hotel = !addForm.hotel">
-                <div class="knob"></div>
-              </div>
-            </div>
-            <div class="field">
-              <label>Apartments</label>
-              <input v-model.number="addForm.apartments" type="number" min="0" max="100" />
-            </div>
+        <!-- Zeile 4 -->
+        <div class="form-row cols-2">
+          <div class="field">
+            <label>Garage Size</label>
+            <input v-model.number="addForm.garage_size" type="number" min="0" />
           </div>
-
-          <div class="form-row cols-2">
-            <div class="field">
-              <label>Garage Size</label>
-              <input v-model.number="addForm.garage_size" type="number" min="0" />
-            </div>
-            <div class="field">
-              <label>Max Keys</label>
-              <input v-model.number="addForm.maxkeys" type="number" min="0" />
-            </div>
+          <div class="field">
+            <label>Max Keys</label>
+            <input v-model.number="addForm.maxkeys" type="number" min="0" />
           </div>
+        </div>
 
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Radius</label>
-              <input v-model.number="addForm.radius" type="number" step="0.1" />
-            </div>
-            <div class="field">
-              <label>OwnerID</label>
-              <input v-model.number="addForm.ownerid" type="number" />
-            </div>
-            <div class="field">
-              <label>Pincode (4-stellig)</label>
-              <input v-model="addForm.pincode" maxlength="4" />
-            </div>
+        <!-- Zeile 5 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Radius</label>
+            <input v-model.number="addForm.radius" type="number" step="0.1" />
           </div>
-
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Eingang</label>
-              <button class="pos-btn" type="button" @click="setAddEntry">Set from Pos</button>
-            </div>
-            <div class="field">
-              <label>Garage Trigger</label>
-              <button class="pos-btn" type="button" @click="setAddGarageTrigger">Set from Pos</button>
-            </div>
-            <div class="field">
-              <label>Garage Spawn</label>
-              <button class="pos-btn" type="button" @click="setAddGarageSpawn">Set from Pos</button>
-            </div>
+          <div class="field">
+            <label>OwnerID</label>
+            <input v-model.number="addForm.ownerid" type="number" />
           </div>
-
-          <div class="form-row cols-1">
-            <div class="field">
-              <label>Allowed Vehicles</label>
-              <div class="inline">
-                <label><input type="checkbox" v-model="addForm.allowed_bike" /> BIKE</label>
-                <label><input type="checkbox" v-model="addForm.allowed_motorbike" /> MOTO</label>
-                <label><input type="checkbox" v-model="addForm.allowed_car" /> CAR</label>
-                <label><input type="checkbox" v-model="addForm.allowed_truck" /> TRUCK</label>
-                <label><input type="checkbox" v-model="addForm.allowed_plane" /> PLANE</label>
-                <label><input type="checkbox" v-model="addForm.allowed_helicopter" /> HELI</label>
-                <label><input type="checkbox" v-model="addForm.allowed_boat" /> BOAT</label>
-              </div>
-            </div>
+          <div class="field">
+            <label>Pincode (4-stellig)</label>
+            <input v-model="addForm.pincode" maxlength="4" />
           </div>
+        </div>
 
-          <div class="add-actions">
-            <div class="error" v-if="addError">{{ addError }}</div>
-            <div class="btn-row">
-              <button class="modal-btn" type="button" @click="cancelAdd">Abbrechen</button>
-              <button class="add-save-btn" type="button" @click="saveAdd">
-                <i class="fa-solid fa-save"></i> Speichern
-              </button>
+        <!-- Zeile 6 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Eingang</label>
+            <button class="pos-btn" type="button" @click="setAddEntry">Set from Pos</button>
+          </div>
+          <div class="field">
+            <label>Garage Trigger</label>
+            <button class="pos-btn" type="button" @click="setAddGarageTrigger">Set from Pos</button>
+          </div>
+          <div class="field">
+            <label>Garage Spawn</label>
+            <button class="pos-btn" type="button" @click="setAddGarageSpawn">Set from Pos</button>
+          </div>
+        </div>
+
+        <!-- Zeile 7 -->
+        <div class="form-row cols-1">
+          <div class="field">
+            <label>Allowed Vehicles</label>
+            <div class="inline">
+              <label><input type="checkbox" v-model="addForm.allowed_bike" /> BIKE</label>
+              <label><input type="checkbox" v-model="addForm.allowed_motorbike" /> MOTO</label>
+              <label><input type="checkbox" v-model="addForm.allowed_car" /> CAR</label>
+              <label><input type="checkbox" v-model="addForm.allowed_truck" /> TRUCK</label>
+              <label><input type="checkbox" v-model="addForm.allowed_plane" /> PLANE</label>
+              <label><input type="checkbox" v-model="addForm.allowed_helicopter" /> HELI</label>
+              <label><input type="checkbox" v-model="addForm.allowed_boat" /> BOAT</label>
             </div>
           </div>
         </div>
 
-        <!-- EDIT FORM INLINE -->
-        <div v-if="editDialog.visible" class="add-form">
-          <h2>Haus bearbeiten #{{ editDialog.form.id }}</h2>
+        <!-- Zeile 8 -->
+        <div class="add-actions">
+          <div class="error" v-if="addError">{{ addError }}</div>
+          <div class="btn-row">
+            <button class="modal-btn" type="button" @click="cancelAdd">Abbrechen</button>
+            <button class="add-save-btn" type="button" @click="saveAdd">
+              <i class="fa-solid fa-save"></i> Speichern
+            </button>
+          </div>
+        </div>
+      </div>
 
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Straßenname</label>
-              <input v-model="editDialog.form.streetName" />
-            </div>
-            <div class="field">
-              <label>Hausnummer</label>
-              <input v-model="editDialog.form.houseNumber" />
-            </div>
-            <div class="field">
-              <label>&nbsp;</label>
+      <!-- INLINE EDIT FORM -->
+      <div v-if="editDialog.visible" class="add-form">
+        <h2>Haus bearbeiten #{{ editDialog.form.id }}</h2>
+
+        <!-- Zeile 1 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Straßenname</label>
+            <input v-model="editDialog.form.streetName" />
+          </div>
+          <div class="field">
+            <label>Hausnummer</label>
+            <input v-model="editDialog.form.houseNumber" />
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+          </div>
+        </div>
+
+        <!-- Zeile 2 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Miete</label>
+            <input v-model.number="editDialog.form.rent" type="number" />
+          </div>
+          <div class="field">
+            <label>Preis</label>
+            <input v-model.number="editDialog.form.price" type="number" />
+          </div>
+          <div class="field">
+            <label>IPL</label>
+            <select v-model="editDialog.form.ipl">
+              <option value="">- kein -</option>
+              <option v-for="i in ipls" :key="i.id" :value="i.id">
+                {{ i.id }} - {{ i.ipl_name }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Zeile 3 -->
+        <div class="form-row cols-2">
+          <div class="field">
+            <label>Hotel</label>
+            <div class="switch"
+                 :class="{ on: !!editDialog.form.hotel }"
+                 @click="editDialog.form.hotel = !editDialog.form.hotel">
+              <div class="knob"></div>
             </div>
           </div>
-
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Miete</label>
-              <input v-model.number="editDialog.form.rent" type="number" />
-            </div>
-            <div class="field">
-              <label>Preis</label>
-              <input v-model.number="editDialog.form.price" type="number" />
-            </div>
-            <div class="field">
-              <label>IPL</label>
-              <select v-model="editDialog.form.ipl">
-                <option value="">- kein -</option>
-                <option v-for="i in ipls" :key="i.id" :value="i.id">
-                  {{ i.id }} - {{ i.ipl_name }}
-                </option>
-              </select>
-            </div>
+          <div class="field">
+            <label>Apartments</label>
+            <input v-model.number="editDialog.form.apartments" type="number" min="0" />
           </div>
+        </div>
 
-          <div class="form-row cols-2">
-            <div class="field">
-              <label>Hotel</label>
-              <div
-                class="switch"
-                :class="{ on: !!editDialog.form.hotel }"
-                @click="editDialog.form.hotel = !editDialog.form.hotel"
-              >
-                <div class="knob"></div>
-              </div>
-            </div>
-            <div class="field">
-              <label>Apartments</label>
-              <input v-model.number="editDialog.form.apartments" type="number" min="0" max="100" />
-            </div>
+        <!-- Zeile 4 -->
+        <div class="form-row cols-2">
+          <div class="field">
+            <label>Garage Size</label>
+            <input v-model.number="editDialog.form.garage_size" type="number" min="0" />
           </div>
-
-          <div class="form-row cols-2">
-            <div class="field">
-              <label>Garage Size</label>
-              <input v-model.number="editDialog.form.garage_size" type="number" min="0" />
-            </div>
-            <div class="field">
-              <label>Max Keys</label>
-              <input v-model.number="editDialog.form.maxkeys" type="number" min="0" />
-            </div>
+          <div class="field">
+            <label>Max Keys</label>
+            <input v-model.number="editDialog.form.maxkeys" type="number" min="0" />
           </div>
+        </div>
 
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Radius</label>
-              <input v-model.number="editDialog.form.radius" type="number" step="0.1" />
-            </div>
-            <div class="field">
-              <label>OwnerID</label>
-              <input v-model.number="editDialog.form.ownerid" type="number" />
-            </div>
-            <div class="field">
-              <label>Pincode (4-stellig)</label>
-              <input v-model="editDialog.form.pincode" maxlength="4" />
-            </div>
+        <!-- Zeile 5 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Radius</label>
+            <input v-model.number="editDialog.form.radius" type="number" step="0.1" />
           </div>
-
-          <div class="form-row cols-3">
-            <div class="field">
-              <label>Eingang</label>
-              <button class="pos-btn" type="button" @click="editSetEntry">Set from Pos</button>
-            </div>
-            <div class="field">
-              <label>Garage Trigger</label>
-              <button class="pos-btn" type="button" @click="editSetGarageTrigger">Set from Pos</button>
-            </div>
-            <div class="field">
-              <label>Garage Spawn</label>
-              <button class="pos-btn" type="button" @click="editSetGarageSpawn">Set from Pos</button>
-            </div>
+          <div class="field">
+            <label>OwnerID</label>
+            <input v-model.number="editDialog.form.ownerid" type="number" />
           </div>
-
-          <div class="form-row cols-1">
-            <div class="field">
-              <label>Allowed Vehicles</label>
-              <div class="inline">
-                <label><input type="checkbox" v-model="editDialog.form.allowed_bike" /> BIKE</label>
-                <label><input type="checkbox" v-model="editDialog.form.allowed_motorbike" /> MOTO</label>
-                <label><input type="checkbox" v-model="editDialog.form.allowed_car" /> CAR</label>
-                <label><input type="checkbox" v-model="editDialog.form.allowed_truck" /> TRUCK</label>
-                <label><input type="checkbox" v-model="editDialog.form.allowed_plane" /> PLANE</label>
-                <label><input type="checkbox" v-model="editDialog.form.allowed_helicopter" /> HELI</label>
-                <label><input type="checkbox" v-model="editDialog.form.allowed_boat" /> BOAT</label>
-              </div>
-            </div>
+          <div class="field">
+            <label>Pincode (4-stellig)</label>
+            <input v-model="editDialog.form.pincode" maxlength="4" />
           </div>
+        </div>
 
-          <div class="add-actions">
-            <div class="error" v-if="editDialog.error">{{ editDialog.error }}</div>
-            <div class="btn-row">
-              <button class="modal-btn" type="button" @click="cancelEdit" :disabled="editDialog.busy">
-                Abbrechen
-              </button>
-              <button class="add-save-btn" type="button" @click="saveEdit" :disabled="editDialog.busy">
-                <i class="fa-solid fa-save"></i>
-                {{ editDialog.busy ? 'Speichere...' : 'Speichern' }}
-              </button>
+        <!-- Zeile 6 -->
+        <div class="form-row cols-3">
+          <div class="field">
+            <label>Eingang</label>
+            <button class="pos-btn" type="button" @click="editSetEntry">Set from Pos</button>
+          </div>
+          <div class="field">
+            <label>Garage Trigger</label>
+            <button class="pos-btn" type="button" @click="editSetGarageTrigger">Set from Pos</button>
+          </div>
+          <div class="field">
+            <label>Garage Spawn</label>
+            <button class="pos-btn" type="button" @click="editSetGarageSpawn">Set from Pos</button>
+          </div>
+        </div>
+
+        <!-- Zeile 7 -->
+        <div class="form-row cols-1">
+          <div class="field">
+            <label>Allowed Vehicles</label>
+            <div class="inline">
+              <label><input type="checkbox" v-model="editDialog.form.allowed_bike" /> BIKE</label>
+              <label><input type="checkbox" v-model="editDialog.form.allowed_motorbike" /> MOTO</label>
+              <label><input type="checkbox" v-model="editDialog.form.allowed_car" /> CAR</label>
+              <label><input type="checkbox" v-model="editDialog.form.allowed_truck" /> TRUCK</label>
+              <label><input type="checkbox" v-model="editDialog.form.allowed_plane" /> PLANE</label>
+              <label><input type="checkbox" v-model="editDialog.form.allowed_helicopter" /> HELI</label>
+              <label><input type="checkbox" v-model="editDialog.form.allowed_boat" /> BOAT</label>
             </div>
           </div>
         </div>
 
-        <!-- DELETE CONFIRM -->
-        <div v-if="deleteConfirm.visible" class="modal-backdrop">
-          <div class="modal">
-            <h3>Haus löschen</h3>
-            <p>
-              Soll das Haus
-              "<strong>{{ deleteConfirm.row && deleteConfirm.row.name }}</strong>"
-              (ID {{ deleteConfirm.row && deleteConfirm.row.id }})
-              wirklich gelöscht werden?
-            </p>
-            <div class="modal-error" v-if="deleteConfirm.error">
-              {{ deleteConfirm.error }}
-            </div>
-            <div class="modal-actions">
-              <button
-                class="modal-btn"
-                type="button"
-                @click="cancelDelete"
-                :disabled="deleteConfirm.busy"
-              >
-                Abbrechen
-              </button>
-              <button
-                class="modal-btn danger"
-                type="button"
-                @click="doDelete"
-                :disabled="deleteConfirm.busy"
-              >
-                {{ deleteConfirm.busy ? 'Lösche...' : 'Löschen' }}
-              </button>
-            </div>
+        <!-- Zeile 8 -->
+        <div class="add-actions">
+          <div class="error" v-if="editDialog.error">{{ editDialog.error }}</div>
+          <div class="btn-row">
+            <button class="modal-btn" type="button" @click="cancelEdit">Abbrechen</button>
+            <button class="add-save-btn" type="button" :disabled="editDialog.busy" @click="saveEdit">
+              <i class="fa-solid fa-save"></i> Speichern
+            </button>
           </div>
         </div>
+      </div>
 
+      <!-- DELETE CONFIRM -->
+      <div v-if="deleteConfirm.visible" class="modal-backdrop">
+        <div class="modal">
+          <h3>Haus löschen</h3>
+          <p>Haus #{{ deleteConfirm.row && deleteConfirm.row.id }} wirklich löschen?</p>
+          <div class="error" v-if="deleteConfirm.error">{{ deleteConfirm.error }}</div>
+          <div class="btn-row">
+            <button class="modal-btn" @click="cancelDelete">Abbrechen</button>
+            <button class="modal-btn danger" :disabled="deleteConfirm.busy" @click="doDelete">
+              Löschen
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   `,
