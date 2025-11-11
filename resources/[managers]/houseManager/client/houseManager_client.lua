@@ -20,6 +20,11 @@ RegisterNetEvent('LCV:house:client:enter', function(data)
 
     local ped = PlayerPedId()
 
+    -- IPL laden, falls gesetzt
+    if data.interiorIpl and data.interiorIpl ~= "" then
+        RequestIpl(data.interiorIpl)
+    end
+
     DoScreenFadeOut(500)
     Wait(600)
 
@@ -29,6 +34,7 @@ RegisterNetEvent('LCV:house:client:enter', function(data)
     Wait(300)
     DoScreenFadeIn(500)
 end)
+
 
 RegisterNetEvent('LCV:house:client:leave', function(data)
     local pos = safeCoords(data and data.entry)
@@ -39,12 +45,18 @@ RegisterNetEvent('LCV:house:client:leave', function(data)
     DoScreenFadeOut(500)
     Wait(600)
 
+    -- IPL entladen, falls gesetzt
+    if data.interiorIpl and data.interiorIpl ~= "" then
+        RemoveIpl(data.interiorIpl)
+    end
+
     SetEntityCoordsNoOffset(ped, pos.x, pos.y, pos.z, false, false, false)
     doDoorFx()
 
     Wait(300)
     DoScreenFadeIn(500)
 end)
+
 
 RegisterNetEvent('LCV:house:sync', function(list)
     houseGarageTriggers = {}

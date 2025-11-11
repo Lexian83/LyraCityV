@@ -16,6 +16,8 @@ const app = new Vue({
         "Faction",
         "Faction_Perms",
         "Character",
+        "Houses",
+        "Houses_IPL",
       ],
     };
   },
@@ -39,6 +41,16 @@ const app = new Vue({
     },
   },
   methods: {
+    setPlacementMode(enabled) {
+      this.placementMode = !!enabled;
+      const screen = document.querySelector(".screen");
+      if (!screen) return;
+      if (this.placementMode) {
+        screen.classList.add("placement-mode");
+      } else {
+        screen.classList.remove("placement-mode");
+      }
+    },
     goNext() {
       if (this.selection >= this.navOptions.length - 1) {
         return;
@@ -87,6 +99,19 @@ const app = new Vue({
       } else if (data.action == "closeADMIN") {
         this.show = false;
         console.log("[ADMIN][CLIENT] Get Trigger to Hide");
+      }
+    });
+    window.addEventListener("message", (event) => {
+      let data = event.data;
+      if (data.action == "openADMIN") {
+        if (this.show) return;
+        this.show = true;
+        console.log("[ADMIN][CLIENT] Get Trigger to Open");
+      } else if (data.action == "closeADMIN") {
+        this.show = false;
+        console.log("[ADMIN][CLIENT] Get Trigger to Hide");
+      } else if (data.action === "setPlacementMode") {
+        this.setPlacementMode(!!data.enabled);
       }
     });
   },

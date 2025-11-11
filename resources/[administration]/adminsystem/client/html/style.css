@@ -1291,3 +1291,8 @@ body {
   margin-left: 3px;
   opacity: 0.7;
 }
+.screen.placement-mode {
+  width: 33vw;
+  left: 0;
+  right: auto;
+}

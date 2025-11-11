@@ -23,10 +23,59 @@ Vue.component("tab-home", {
       dutySelected: "", // gewählte Faction-ID für Einstempeln/Ausstempeln
       dutyBusy: false,
       dutyError: null,
+      // Teleport zu Koordinaten
+      teleportCoords: {
+        x: "",
+        y: "",
+        z: "",
+      },
+      teleportBusy: false,
     };
   },
 
   methods: {
+    async teleportToCoords() {
+      if (this.teleportBusy) return;
+      this.error = null;
+
+      const x = parseFloat(this.teleportCoords.x);
+      const y = parseFloat(this.teleportCoords.y);
+      const z = parseFloat(this.teleportCoords.z);
+
+      if (isNaN(x) || isNaN(y) || isNaN(z)) {
+        this.error = "Bitte gültige X/Y/Z-Koordinaten eingeben.";
+        return;
+      }
+
+      this.teleportBusy = true;
+
+      try {
+        const res = await fetch(
+          `https://${this.getResName()}/LCV:ADMIN:Teleport:Coords`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json; charset=UTF-8",
+            },
+            body: JSON.stringify({ x, y, z }),
+          }
+        );
+
+        const json = await res.json().catch(() => null);
+
+        if (!json || json.ok === false) {
+          throw new Error(
+            (json && json.error) || "Teleport zu Koordinaten fehlgeschlagen"
+          );
+        }
+      } catch (e) {
+        console.error("[ADMIN][HOME] TeleportToCoords error:", e);
+        this.error = `Teleport fehlgeschlagen: ${e.message || e}`;
+      } finally {
+        this.teleportBusy = false;
+      }
+    },
+
     getResName() {
       return typeof GetParentResourceName === "function"
         ? GetParentResourceName()
@@ -326,13 +375,59 @@ Vue.component("tab-home", {
             </div>
           </div>
 
-          <button
+                    <button
             class="home-button"
             @click="portToWaypoint"
             style="margin-top:10px;width:100%;"
           >
             Port zur Kartenmarkierung
           </button>
+
+          <!-- TELEPORT TO COORDS -->
+          <div class="teleport-box" style="margin-top:10px; padding:8px; border-radius:8px; background:rgba(0,0,0,0.25);">
+            <div style="font-weight:600; margin-bottom:4px;">
+              Teleport zu X / Y / Z
+            </div>
+            <div style="display:flex; gap:4px; margin-bottom:4px;">
+              <input
+                v-model="teleportCoords.x"
+                type="number"
+                step="0.01"
+                placeholder="X"
+                class="input"
+                style="flex:1;"
+              />
+              <input
+                v-model="teleportCoords.y"
+                type="number"
+                step="0.01"
+                placeholder="Y"
+                class="input"
+                style="flex:1;"
+              />
+              <input
+                v-model="teleportCoords.z"
+                type="number"
+                step="0.01"
+                placeholder="Z"
+                class="input"
+                style="flex:1;"
+              />
+            </div>
+            <button
+              class="home-button"
+              :disabled="teleportBusy"
+              @click="teleportToCoords"
+              style="width:100%;"
+            >
+              {{ teleportBusy ? "Teleportiere..." : "Teleport ausführen" }}
+            </button>
+          </div>
+
+          <div v-if="error" class="status error" style="margin-top:6px;">
+            {{ error }}
+          </div>
+
 
           <div v-if="error" class="status error" style="margin-top:6px;">
             {{ error }}

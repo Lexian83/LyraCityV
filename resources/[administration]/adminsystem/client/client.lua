@@ -878,6 +878,193 @@ RegisterNUICallback('LCV:ADMIN:Characters:Delete', function(data, cb)
     end, data)
 end)
 
+-- ===== HOUSING SYSTEM =====
+
+RegisterNUICallback('LCV:ADMIN:UI:SetPlacementMode', function(data, cb)
+    local enabled = data and data.enabled == true
+
+    if enabled then
+        -- UI bleibt fokussierbar, aber Input auch im Spiel
+        SetNuiFocus(true, true)
+        SetNuiFocusKeepInput(true)
+    else
+        -- Vollbild-Admin, Input wieder blocken wie gehabt
+        SetNuiFocus(true, true)
+        SetNuiFocusKeepInput(false)
+    end
+
+    SendNUIMessage({
+        action = "setPlacementMode",
+        enabled = enabled
+    })
+
+    cb({ ok = true })
+end)
+-- ===== HOUSES: NUI BRIDGE =====
+
+RegisterNUICallback('LCV:ADMIN:Houses:GetAll', function(_, cb)
+    lib.callback('LCV:ADMIN:Houses:GetAll', false, function(result)
+        cb(result or { ok = false, error = 'no_response', houses = {} })
+    end)
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:Add', function(data, cb)
+    lib.callback('LCV:ADMIN:Houses:Add', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:Update', function(data, cb)
+    lib.callback('LCV:ADMIN:Houses:Update', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:Delete', function(data, cb)
+    if not data or not data.id then
+        cb({ ok = false, error = 'missing_id' })
+        return
+    end
+
+    lib.callback('LCV:ADMIN:Houses:Delete', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:GetPlayerPos', function(_, cb)
+    local ped = PlayerPedId()
+    if not ped or ped == 0 or not DoesEntityExist(ped) then
+        cb({ ok = false, error = 'no_ped' })
+        return
+    end
+    local coords = GetEntityCoords(ped)
+    cb({
+        ok = true,
+        x = coords.x + 0.0,
+        y = coords.y + 0.0,
+        z = coords.z + 0.0
+    })
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:Teleport', function(data, cb)
+    if not data or not data.x or not data.y or not data.z then
+        cb({ ok = false, error = 'bad_coords' })
+        return
+    end
+
+    CreateThread(function()
+        if not IsScreenFadedOut() and not IsScreenFadingOut() then
+            DoScreenFadeOut(250)
+            Wait(260)
+        end
+
+        TriggerServerEvent('LCV:ADMIN:Houses:Teleport', data.id, data.x, data.y, data.z)
+
+        Wait(200)
+        DoScreenFadeIn(250)
+    end)
+
+    cb({ ok = true })
+end)
+
+-- ===== HOUSES IPL: NUI BRIDGE =====
+
+RegisterNUICallback('LCV:ADMIN:HousesIPL:GetAll', function(_, cb)
+    lib.callback('LCV:ADMIN:HousesIPL:GetAll', false, function(result)
+        cb(result or { ok = false, error = 'no_response', ipls = {} })
+    end)
+end)
+
+RegisterNUICallback('LCV:ADMIN:HousesIPL:Add', function(data, cb)
+    lib.callback('LCV:ADMIN:HousesIPL:Add', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:HousesIPL:Update', function(data, cb)
+    lib.callback('LCV:ADMIN:HousesIPL:Update', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:HousesIPL:Delete', function(data, cb)
+    if not data or not data.id then
+        cb({ ok = false, error = 'missing_id' })
+        return
+    end
+
+    lib.callback('LCV:ADMIN:HousesIPL:Delete', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:HousesIPL:GetPlayerPos', function(_, cb)
+    local ped = PlayerPedId()
+    if not ped or ped == 0 or not DoesEntityExist(ped) then
+        cb({ ok = false, error = 'no_ped' })
+        return
+    end
+    local coords = GetEntityCoords(ped)
+    cb({
+        ok = true,
+        x = coords.x + 0.0,
+        y = coords.y + 0.0,
+        z = coords.z + 0.0
+    })
+end)
+
+RegisterNUICallback('LCV:ADMIN:HousesIPL:Teleport', function(data, cb)
+    if not data or not data.x or not data.y or not data.z then
+        cb({ ok = false, error = 'bad_coords' })
+        return
+    end
+
+    CreateThread(function()
+        if not IsScreenFadedOut() and not IsScreenFadingOut() then
+            DoScreenFadeOut(250)
+            Wait(260)
+        end
+
+        TriggerServerEvent('LCV:ADMIN:HousesIPL:Teleport', data.id, data.x, data.y, data.z)
+
+        Wait(200)
+        DoScreenFadeIn(250)
+    end)
+
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('LCV:ADMIN:Teleport:Coords', function(data, cb)
+    if not data then
+        cb({ ok = false, error = 'no_data' })
+        return
+    end
+
+    local x = tonumber(data.x)
+    local y = tonumber(data.y)
+    local z = tonumber(data.z)
+
+    if not x or not y or not z then
+        cb({ ok = false, error = 'bad_coords' })
+        return
+    end
+
+    CreateThread(function()
+        if not IsScreenFadedOut() and not IsScreenFadingOut() then
+            DoScreenFadeOut(250)
+            Wait(260)
+        end
+
+        TriggerServerEvent('LCV:ADMIN:Teleport:Coords', x, y, z)
+
+        Wait(200)
+        DoScreenFadeIn(250)
+    end)
+
+    cb({ ok = true })
+end)
+
+
 -- Cleanup
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then

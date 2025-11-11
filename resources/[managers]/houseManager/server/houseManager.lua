@@ -66,8 +66,9 @@ end
 local function getHouseIPL(iplId)
     iplId = tonumber(iplId)
     if not iplId then return nil end
-    return MySQL.single.await('SELECT * FROM house_ipl WHERE id = ?', { iplId })
+    return MySQL.single.await('SELECT id, ipl_name, ipl, posx, posy, posz, exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { iplId })
 end
+
 
 local function getAllHouses()
     return MySQL.query.await('SELECT id, garage_trigger_x, garage_trigger_y, garage_trigger_z FROM houses', {}) or {}
@@ -345,12 +346,33 @@ RegisterNetEvent('LCV:house:enter', function(houseId)
     -- Innenposition priorisieren:
     local ix, iy, iz = house.inside_x, house.inside_y, house.inside_z
 
-    if (not ix or not iy or not iz) and house.ipl then
-        local ipl = getHouseIPL(house.ipl)
-        if ipl then
-            ix, iy, iz = ipl.posx, ipl.posy, ipl.posz
-        end
+local iplData
+if (not ix or not iy or not iz) and house.ipl then
+    iplData = getHouseIPL(house.ipl)
+    if iplData then
+        ix, iy, iz = iplData.posx, iplData.posy, iplData.posz
     end
+elseif house.ipl then
+    iplData = getHouseIPL(house.ipl)
+end
+
+if not ix or not iy or not iz then
+    log("WARN", ("Enter: Keine Innenposition für Haus #%d"):format(houseId))
+    return
+end
+
+local bucketId = house.id
+if SetPlayerRoutingBucket then
+    SetPlayerRoutingBucket(src, bucketId)
+end
+
+TriggerClientEvent('LCV:house:client:enter', src, {
+    houseId = house.id,
+    bucketId = bucketId,
+    inside = { x = ix, y = iy, z = iz },
+    interiorIpl = iplData and iplData.ipl or nil
+})
+
 
     if not ix or not iy or not iz then
         log("WARN", ("Enter: Keine Innenposition für Haus #%d"):format(houseId))
@@ -378,15 +400,22 @@ RegisterNetEvent('LCV:house:leave', function(houseId)
     local house = getHouse(houseId)
     if not house then return end
 
-    if SetPlayerRoutingBucket then
-        SetPlayerRoutingBucket(src, 0)
-    end
+    local iplData
+if house.ipl then
+    iplData = getHouseIPL(house.ipl)
+end
 
-    TriggerClientEvent('LCV:house:client:leave', src, {
-        houseId = house.id,
-        bucketId = 0,
-        entry = { x = house.entry_x, y = house.entry_y, z = house.entry_z },
-    })
+if SetPlayerRoutingBucket then
+    SetPlayerRoutingBucket(src, 0)
+end
+
+TriggerClientEvent('LCV:house:client:leave', src, {
+    houseId = house.id,
+    bucketId = 0,
+    entry = { x = house.entry_x, y = house.entry_y, z = house.entry_z },
+    interiorIpl = iplData and iplData.ipl or nil
+})
+
 end)
 
 -- =========================
