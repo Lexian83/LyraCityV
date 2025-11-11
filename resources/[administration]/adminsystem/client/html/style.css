@@ -1296,3 +1296,25 @@ body {
   left: 0;
   right: auto;
 }
+.add-form .form-row {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.add-form .form-row.cols-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.add-form .form-row.cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.add-form .form-row.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.add-actions .btn-row {
+  display: flex;
+  gap: 6px;
+}

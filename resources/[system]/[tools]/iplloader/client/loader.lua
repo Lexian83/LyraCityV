@@ -8,8 +8,8 @@ function RequestAllIpls()
 
 	-- Trevor: 1985.481, 3828.768, 32.5
 	-- Trash or Tidy. Only choose one.
-	RequestIpl("TrevorsTrailerTrash")
-	--RequestIpl("TrevorsTrailerTidy")
+	--RequestIpl("TrevorsTrailerTrash")
+	RequestIpl("TrevorsTrailerTidy")
 
 	-- Vangelico Jewelry Store: -637.202, -239.163, 38.1
 	RequestIpl("post_hiest_unload")

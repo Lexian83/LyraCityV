@@ -9,6 +9,7 @@ local json = json
 -- =========================
 -- Utils & Logging
 -- =========================
+
 local function log(level, msg)
     if LCV.Util and LCV.Util.log then
         LCV.Util.log(level, ('[HouseManager] %s'):format(tostring(msg)))
@@ -17,14 +18,12 @@ local function log(level, msg)
     end
 end
 
--- Sicherstellen, dass MySQL verfügbar ist
 if not MySQL then
     print('[HouseManager][WARN] MySQL ist nil beim Laden. Prüfe @oxmysql/lib/MySQL.lua im fxmanifest.')
 end
 
-
-local function toNumber(val)
-    local n = tonumber(val)
+local function toNumber(v)
+    local n = tonumber(v)
     return n
 end
 
@@ -36,15 +35,16 @@ local function jenc(v)
     return nil
 end
 
-local function createInteractionPoint(name, description, pType, x, y, z, dataTbl)
+local function createInteractionPoint(name, description, pType, x, y, z, radius, dataTbl)
     if not x or not y or not z then return end
+    radius = tonumber(radius) or 1.0
 
     local dataJson = jenc(dataTbl)
 
     MySQL.insert.await([[
         INSERT INTO interaction_points
             (name, description, type, x, y, z, radius, enabled, data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
     ]], {
         name,
         description or name,
@@ -52,8 +52,7 @@ local function createInteractionPoint(name, description, pType, x, y, z, dataTbl
         tonumber(x) or 0.0,
         tonumber(y) or 0.0,
         tonumber(z) or 0.0,
-        1.0,                        -- radius = 1
-        1,                          -- enabled = 1
+        radius,
         dataJson
     })
 end
@@ -71,24 +70,24 @@ end
 local function getHouseIPL(iplId)
     iplId = tonumber(iplId)
     if not iplId then return nil end
-    return MySQL.single.await('SELECT id, ipl_name, ipl, posx, posy, posz, exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { iplId })
+    return MySQL.single.await([[
+        SELECT id, ipl_name, ipl, posx, posy, posz, exit_x, exit_y, exit_z
+        FROM house_ipl WHERE id = ?
+    ]], { iplId })
 end
-
 
 local function getAllHouses()
     local rows = MySQL.query.await([[
         SELECT h.id,
                h.garage_trigger_x, h.garage_trigger_y, h.garage_trigger_z,
-               i.radius
+               ig.radius
         FROM houses h
-        LEFT JOIN interaction_points i
-          ON JSON_EXTRACT(i.data, '$.houseid') = h.id
-         AND i.name = 'HOUSE_GARAGE'
+        LEFT JOIN interaction_points ig
+          ON ig.name = 'HOUSE_GARAGE'
+         AND JSON_EXTRACT(ig.data, '$.houseid') = h.id
     ]]) or {}
     return rows
 end
-
-
 
 local function sendAllHouses(target)
     local houses = getAllHouses()
@@ -104,60 +103,77 @@ local function sendAllHouses(target)
 
     if count > 0 then
         local h = houses[1]
-        log("DEBUG", ("House[1]: id=%s gt_x=%s gt_y=%s gt_z=%s"):format(
+        log("DEBUG", ("House[1]: id=%s gt_x=%s gt_y=%s gt_z=%s radius=%s"):format(
             tostring(h.id),
             tostring(h.garage_trigger_x),
             tostring(h.garage_trigger_y),
-            tostring(h.garage_trigger_z)
+            tostring(h.garage_trigger_z),
+            tostring(h.radius)
         ))
     end
 end
-
 
 -- =========================
 -- Exports
 -- =========================
 
--- getownerbyhouseid(houseId) -> ownerid or nil
 exports('getownerbyhouseid', function(houseId)
     local row = MySQL.single.await('SELECT ownerid FROM houses WHERE id = ?', { tonumber(houseId) })
     return row and tonumber(row.ownerid) or nil
 end)
 
--- getlockstate(houseId) -> 0/1 or nil
 exports('getlockstate', function(houseId)
     local row = MySQL.single.await('SELECT lock_state FROM houses WHERE id = ?', { tonumber(houseId) })
     return row and tonumber(row.lock_state) or nil
 end)
 
--- getrent(houseId) -> rent or nil
 exports('getrent', function(houseId)
     local row = MySQL.single.await('SELECT rent FROM houses WHERE id = ?', { tonumber(houseId) })
     return row and tonumber(row.rent) or nil
 end)
 
--- getprice(houseId) -> price or nil
 exports('getprice', function(houseId)
     local row = MySQL.single.await('SELECT price FROM houses WHERE id = ?', { tonumber(houseId) })
     return row and tonumber(row.price) or nil
 end)
 
+exports('getpincode', function(houseId)
+    local row = MySQL.single.await('SELECT pincode FROM houses WHERE id = ?', { tonumber(houseId) })
+    return row and row.pincode or nil
+end)
+
+exports('getanzahlapartments', function(houseId)
+    local row = MySQL.single.await('SELECT apartments FROM houses WHERE id = ?', { tonumber(houseId) })
+    return row and tonumber(row.apartments) or 0
+end)
+
 -- =========================
--- House CRUD Events
--- (TODO: Permissions an dein Adminsystem hängen)
+-- House CRUD
 -- =========================
 
--- House erstellen
 RegisterNetEvent('LCV:house:create', function(data)
     local src  = source
     data       = data or {}
 
-    -- Minimal-Validation
     local name = tostring(data.name or ""):sub(1, 128)
     if name == "" then
         log("WARN", ("create: ungültiger Name von src=%s"):format(src))
         return
     end
+
+    local hotel        = (tonumber(data.hotel) == 1) and 1 or 0
+    local apartments   = tonumber(data.apartments) or 0
+    local garage_size  = tonumber(data.garage_size) or 0
+    local maxkeys      = tonumber(data.maxkeys) or 0
+    local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
+
+    local allowed_bike        = data.allowed_bike and 1 or 0
+    local allowed_motorbike   = data.allowed_motorbike and 1 or 0
+    local allowed_car         = data.allowed_car and 1 or 0
+    local allowed_truck       = data.allowed_truck and 1 or 0
+    local allowed_plane       = data.allowed_plane and 1 or 0
+    local allowed_helicopter  = data.allowed_helicopter and 1 or 0
+    local allowed_boat        = data.allowed_boat and 1 or 0
 
     local params = {
         name,
@@ -176,88 +192,129 @@ RegisterNetEvent('LCV:house:create', function(data)
         toNumber(data.rent),
         data.rent_start or nil,
         jenc(data.data),
-        (data.lock_state == 0 and 0) or 1,
-        toNumber(data.inside_x),
-        toNumber(data.inside_y),
-        toNumber(data.inside_z),
+        (tonumber(data.lock_state) == 0) and 0 or 1,
         toNumber(data.ipl),
         toNumber(data.fridgeid),
-        toNumber(data.storeid)
+        toNumber(data.storeid),
+        hotel,
+        apartments,
+        garage_size,
+        allowed_bike,
+        allowed_motorbike,
+        allowed_car,
+        allowed_truck,
+        allowed_plane,
+        allowed_helicopter,
+        allowed_boat,
+        maxkeys,
+        nil,      -- keys
+        pincode
     }
 
     local id = MySQL.insert.await([[
         INSERT INTO houses
-        (name, ownerid, entry_x, entry_y, entry_z,
-         garage_trigger_x, garage_trigger_y, garage_trigger_z,
-         garage_x, garage_y, garage_z,
-         price, buyed_at, rent, rent_start, data, lock_state,
-         inside_x, inside_y, inside_z, ipl, fridgeid, storeid)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (name, ownerid,
+             entry_x, entry_y, entry_z,
+             garage_trigger_x, garage_trigger_y, garage_trigger_z,
+             garage_x, garage_y, garage_z,
+             price, buyed_at, rent, rent_start, data, lock_state,
+             ipl, fridgeid, storeid,
+             hotel, apartments, garage_size,
+             allowed_bike, allowed_motorbike, allowed_car,
+             allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
+             maxkeys, keys, pincode)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?)
     ]], params)
 
-    if id and id > 0 then
-    local houseId   = id
-    local houseName = name
-
-    -- ENTRY: HOUSE
-    -- name = "HOUSE"
-    -- description = houses.name
-    -- type = "house"
-    -- xyz = entry_x/y/z
-    createInteractionPoint(
-        'HOUSE',
-        houseName,
-        'house',
-        params[3], params[4], params[5],
-        { houseid = houseId }
-    )
-
-    -- GARAGE: HOUSE_GARAGE (nur wenn Trigger-Koordinaten vorhanden)
-    -- name = "HOUSE_GARAGE"
-    -- description = houses.name
-    -- type = "garage"
-    -- xyz = garage_trigger_x/y/z
-    if params[6] and params[7] and params[8] then
-        createInteractionPoint(
-            'HOUSE_GARAGE',
-            houseName,
-            'garage',
-            params[6], params[7], params[8],
-            { houseid = houseId }
-        )
+    if not id or id <= 0 then
+        log("ERROR", ("Haus erstellen fehlgeschlagen von src=%s"):format(src))
+        return
     end
 
-    -- EXIT: EXIT_HOUSE (nur wenn ipl + exit_x/y/z definiert)
-    -- name = "EXIT_HOUSE"
-    -- description = houses.name
-    -- type = "house" (gleicher Typ wie Entry für deinen Interaction-Flow)
-    -- xyz = exit_x/y/z aus house_ipl
-    local iplId = params[21]
+    local houseId   = id
+    local houseName = name
+    local radius    = tonumber(data.radius) or 0.5
+    local entry_x, entry_y, entry_z = params[3], params[4], params[5]
+    local dataTbl = { houseid = houseId }
+
+    -- Entry
+    createInteractionPoint('HOUSE', houseName, 'house', entry_x, entry_y, entry_z, radius, dataTbl)
+
+    -- Garage Trigger
+    local gx, gy, gz = params[6], params[7], params[8]
+    if gx and gy and gz then
+        createInteractionPoint('HOUSE_GARAGE', houseName, 'garage', gx, gy, gz, radius, dataTbl)
+    end
+
+        -- Exit über IPL
+    local iplId = params[19]
     if iplId then
-        local ipl = MySQL.single.await('SELECT exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { iplId })
+        local ipl = getHouseIPL(iplId)
         if ipl and ipl.exit_x and ipl.exit_y and ipl.exit_z then
-            createInteractionPoint(
-                'EXIT_HOUSE',
-                houseName,
-                'house',
-                ipl.exit_x, ipl.exit_y, ipl.exit_z,
-                { houseid = houseId }
-            )
+            createInteractionPoint('EXIT_HOUSE', houseName, 'house_exit', ipl.exit_x, ipl.exit_y, ipl.exit_z, radius, dataTbl)
         else
-            log("WARN", ("Haus #%d: ipl=%s hat keine exit_x/y/z, EXIT_HOUSE nicht erzeugt."):format(houseId, tostring(iplId)))
+            log("WARN", ("Haus #%d: ipl=%s ohne exit_x/y/z, EXIT_HOUSE nicht erzeugt."):format(houseId, tostring(iplId)))
+        end
+    end
+
+    -- =========================
+    -- Hotel-Blip automatisch anlegen
+    -- =========================
+    if hotel == 1 then
+        local bx, by, bz = entry_x, entry_y, entry_z
+
+        if bx and by and bz then
+            local blipId = MySQL.insert.await([[
+                INSERT INTO blips
+                    (name, x, y, z, sprite, color, scale, shortRange, display, category, visiblefor, enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ]], {
+                houseName,          -- name
+                bx, by, bz,         -- coords
+                357,                -- sprite (Hotel/Icon)
+                3,                  -- color (hellblau)
+                1.0,                -- scale
+                0,                  -- shortRange (0 = global sichtbar)
+                4,                  -- display
+                'Hotel',            -- category
+                0,                  -- visiblefor (0 = alle)
+                1                   -- enabled
+            })
+
+            if blipId and blipId > 0 then
+                -- direkt an alle Clients pushen, ohne kompletten Reload
+                TriggerClientEvent('lcv:blip:client:spawnOne', -1, {
+                    id         = blipId,
+                    name       = houseName,
+                    coords     = { x = bx, y = by, z = bz },
+                    sprite     = 357,
+                    color      = 3,
+                    scale      = 1.0,
+                    shortRange = false,
+                    display    = 4,
+                    category   = 'Hotel',
+                    visiblefor = 0,
+                    enabled    = true
+                })
+
+                log("INFO", ("Hotel-Blip #%d für Haus #%d '%s' erzeugt."):format(blipId, houseId, houseName))
+            else
+                log("WARN", ("Haus #%d '%s': Hotel-Blip konnte nicht angelegt werden."):format(houseId, houseName))
+            end
+        else
+            log("WARN", ("Haus #%d '%s' ist Hotel, aber Entry-Coords fehlen -> kein Blip."):format(houseId, houseName))
         end
     end
 
     log("INFO", ("Haus + InteractionPoints erstellt #%d von src=%s"):format(houseId, src))
-    TriggerClientEvent('LCV:house:refresh', -1, houseId)
-    sendAllHouses()
-else
-    log("ERROR", ("Haus erstellen fehlgeschlagen von src=%s"):format(src))
-end
-
+    TriggerEvent('LCV:house:forceSync')
 end)
 
--- Haus updaten (only whitelisted Felder)
+
 RegisterNetEvent('LCV:house:update', function(houseId, patch)
     local src = source
     houseId   = tonumber(houseId)
@@ -272,28 +329,33 @@ RegisterNetEvent('LCV:house:update', function(houseId, patch)
         price = true, buyed_at = true,
         rent = true, rent_start = true,
         data = true, lock_state = true,
-        inside_x = true, inside_y = true, inside_z = true,
         ipl = true, fridgeid = true, storeid = true,
+        hotel = true, apartments = true, garage_size = true,
+        allowed_bike = true, allowed_motorbike = true, allowed_car = true,
+        allowed_truck = true, allowed_plane = true, allowed_helicopter = true, allowed_boat = true,
+        maxkeys = true, keys = true, pincode = true
     }
 
     local sets, vals = {}, {}
     for k, v in pairs(patch) do
         if allowed[k] then
-            if k == 'data' then
+            if k == 'data' or k == 'keys' then
                 v = jenc(v)
             elseif k == 'lock_state' then
                 v = (tonumber(v) == 0) and 0 or 1
+            elseif k == 'pincode' then
+                v = (v ~= nil and v ~= '') and tostring(v) or nil
             elseif k ~= 'buyed_at' and k ~= 'rent_start' and k ~= 'name' then
                 v = toNumber(v)
             end
-            table.insert(sets, ("`%s` = ?"):format(k))
-            table.insert(vals, v)
+            sets[#sets+1] = ("`%s` = ?"):format(k)
+            vals[#vals+1] = v
         end
     end
 
     if #sets == 0 then return end
 
-    table.insert(vals, houseId)
+    vals[#vals+1] = houseId
 
     local affected = MySQL.update.await(
         ("UPDATE houses SET %s WHERE id = ?"):format(table.concat(sets, ", ")),
@@ -302,76 +364,65 @@ RegisterNetEvent('LCV:house:update', function(houseId, patch)
 
     if affected and affected > 0 then
         log("INFO", ("Haus #%d aktualisiert von src=%s"):format(houseId, src))
-        TriggerClientEvent('LCV:house:refresh', -1, houseId)
-        sendAllHouses()
+        TriggerEvent('LCV:house:forceSync')
     end
 end)
 
--- Haus löschen
 RegisterNetEvent('LCV:house:delete', function(houseId)
     local src = source
     houseId = tonumber(houseId)
     if not houseId then return end
 
+    MySQL.update.await([[
+        DELETE FROM interaction_points
+        WHERE JSON_EXTRACT(data, '$.houseid') = ?
+    ]], { houseId })
+
     local affected = MySQL.update.await('DELETE FROM houses WHERE id = ?', { houseId })
     if affected and affected > 0 then
         log("INFO", ("Haus #%d gelöscht von src=%s"):format(houseId, src))
-        TriggerClientEvent('LCV:house:deleted', -1, houseId)
-        sendAllHouses()
+        TriggerEvent('LCV:house:forceSync')
     end
 end)
 
--- lockstate updaten
 RegisterNetEvent('LCV:house:setLockState', function(houseId, state)
     houseId = tonumber(houseId)
-    local src = source
     if not houseId then return end
     local lock = (tonumber(state) == 0) and 0 or 1
 
     MySQL.update.await('UPDATE houses SET lock_state = ? WHERE id = ?', { lock, houseId })
-    log("DEBUG", ("LockState Haus #%d -> %d (src=%s)"):format(houseId, lock, src))
     TriggerClientEvent('LCV:house:lockChanged', -1, houseId, lock)
 end)
 
--- owner updaten
 RegisterNetEvent('LCV:house:setOwner', function(houseId, ownerId)
     houseId = tonumber(houseId)
     ownerId = tonumber(ownerId) or 0
     if not houseId then return end
 
-    MySQL.update.await('UPDATE houses SET ownerid = ?, buyed_at = IF(? > 0, NOW(), buyed_at) WHERE id = ?', {
-        ownerId, ownerId, houseId
-    })
-    log("INFO", ("Owner Haus #%d -> %d"):format(houseId, ownerId))
-    TriggerClientEvent('LCV:house:ownerChanged', -1, houseId, ownerId)
+    MySQL.update.await([[
+        UPDATE houses
+        SET ownerid = ?, buyed_at = IF(? > 0, NOW(), buyed_at)
+        WHERE id = ?
+    ]], { ownerId, ownerId, houseId })
 end)
 
--- rentstart updaten
 RegisterNetEvent('LCV:house:setRentStart', function(houseId, startDate)
     houseId = tonumber(houseId)
     if not houseId then return end
-    -- startDate: string 'YYYY-MM-DD HH:MM:SS' oder nil
     MySQL.update.await('UPDATE houses SET rent_start = ? WHERE id = ?', { startDate, houseId })
-    log("DEBUG", ("RentStart Haus #%d -> %s"):format(houseId, tostring(startDate)))
 end)
 
--- Sync für die kreise auf dem boden
 RegisterNetEvent('LCV:house:requestSync', function()
-    local src = source
-    sendAllHouses(src)
+    sendAllHouses(source)
 end)
 
--- Ermöglicht anderen Ressourcen (z.B. Adminsystem),
--- einen Refresh aller Clients auszulösen.
 RegisterNetEvent('LCV:house:forceSync', function()
     sendAllHouses()
 end)
 
-
 -- =========================
--- Enter / Leave House
+-- Enter / Leave
 -- =========================
--- erwartet: Client triggert diese Serverevents mit gültiger houseId
 
 RegisterNetEvent('LCV:house:enter', function(houseId)
     local src = source
@@ -380,17 +431,10 @@ RegisterNetEvent('LCV:house:enter', function(houseId)
 
     local house = getHouse(houseId)
     if not house then return end
-
-    if not house.ipl then
-        log("WARN", ("Enter: Haus #%d hat kein IPL gesetzt."):format(houseId))
-        return
-    end
+    if not house.ipl then return end
 
     local ipl = getHouseIPL(house.ipl)
-    if not ipl or not ipl.posx or not ipl.posy or not ipl.posz then
-        log("WARN", ("Enter: Keine Innenposition für Haus #%d (IPL #%s)"):format(houseId, tostring(house.ipl)))
-        return
-    end
+    if not ipl or not ipl.posx or not ipl.posy or not ipl.posz then return end
 
     local bucketId = house.id
     if SetPlayerRoutingBucket then
@@ -401,10 +445,9 @@ RegisterNetEvent('LCV:house:enter', function(houseId)
         houseId     = house.id,
         bucketId    = bucketId,
         inside      = { x = ipl.posx, y = ipl.posy, z = ipl.posz },
-        interiorIpl = ipl.ipl and ipl.ipl ~= '' and ipl.ipl or nil,
+        interiorIpl = (ipl.ipl and ipl.ipl ~= '' and ipl.ipl) or nil,
     })
 end)
-
 
 RegisterNetEvent('LCV:house:leave', function(houseId)
     local src = source
@@ -414,7 +457,7 @@ RegisterNetEvent('LCV:house:leave', function(houseId)
     local house = getHouse(houseId)
     if not house then return end
 
-    local ipl = nil
+    local ipl
     if house.ipl then
         ipl = getHouseIPL(house.ipl)
     end
@@ -427,32 +470,29 @@ RegisterNetEvent('LCV:house:leave', function(houseId)
         houseId     = house.id,
         bucketId    = 0,
         entry       = { x = house.entry_x, y = house.entry_y, z = house.entry_z },
-        interiorIpl = ipl and ipl.ipl and ipl.ipl ~= '' and ipl.ipl or nil,
+        interiorIpl = (ipl and ipl.ipl and ipl.ipl ~= '' and ipl.ipl) or nil,
     })
 end)
-
 
 -- =========================
 -- Weekly Rent Watcher
 -- =========================
--- Konfig in server.cfg:
--- set lcv_house_rent_day 0    # 0=Sonntag, 1=Montag, ... 6=Samstag
+-- server.cfg:
+-- set lcv_house_rent_day 0
 -- set lcv_house_rent_hour 22
 -- set lcv_house_rent_minute 0
 
 local function getRentConvarInt(name, default)
     local v = tonumber(GetConvar(name, tostring(default)))
-    if not v then return default end
-    return v
+    return v or default
 end
 
 local rentDay    = getRentConvarInt('lcv_house_rent_day', 0)
 local rentHour   = getRentConvarInt('lcv_house_rent_hour', 22)
 local rentMinute = getRentConvarInt('lcv_house_rent_minute', 0)
 
--- Lua: os.date('*t').wday: 1=Sonntag ... 7=Samstag
 local function isRentTime(now)
-    local wday = (now.wday - 1) -- 0-6
+    local wday = now.wday - 1 -- 1=Sonntag -> 0
     return (wday == rentDay) and (now.hour == rentHour) and (now.min == rentMinute)
 end
 
@@ -479,16 +519,18 @@ local function runRentCycle()
     for _, h in ipairs(houses) do
         local ownerId = tonumber(h.ownerid)
         local rent    = tonumber(h.rent) or 0
-
         if ownerId and rent > 0 then
-            local acc = MySQL.single.await('SELECT account_number, balance FROM bank_accounts WHERE owner = ? LIMIT 1', { ownerId })
+            local acc = MySQL.single.await([[
+                SELECT account_number, balance
+                FROM bank_accounts
+                WHERE owner = ?
+                LIMIT 1
+            ]], { ownerId })
 
             if not acc or (acc.balance or 0) < rent then
-                -- Kein/zu wenig Geld -> Haus freigeben
                 MySQL.update.await('UPDATE houses SET ownerid = 0, rent_start = NULL WHERE id = ?', { h.id })
                 log("INFO", ("Miete fehlgeschlagen -> Haus #%d von owner=%d freigegeben."):format(h.id, ownerId))
             else
-                -- Abbuchen
                 local affected = MySQL.update.await([[
                     UPDATE bank_accounts
                     SET balance = balance - ?
@@ -496,24 +538,19 @@ local function runRentCycle()
                 ]], { rent, acc.account_number, rent })
 
                 if affected and affected > 0 then
-                    local newBal = MySQL.scalar.await('SELECT balance FROM bank_accounts WHERE account_number = ?', { acc.account_number }) or 0
-
                     MySQL.insert.await([[
                         INSERT INTO bank_log (account_number, kind, amount, source, destination, meta)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (?, 'withdraw', ?, 'house_rent', ?, ?)
                     ]], {
                         acc.account_number,
-                        'withdraw',
                         rent,
-                        'house_rent',
                         ('house_' .. h.id),
                         jenc({ house_id = h.id, ownerid = ownerId })
                     })
 
-                    log("INFO", ("Miete abgebucht: Haus #%d owner=%d rent=%d newBalance=%d")
-                        :format(h.id, ownerId, rent, newBal))
+                    log("INFO", ("Miete abgebucht: Haus #%d owner=%d rent=%d")
+                        :format(h.id, ownerId, rent))
                 else
-                    -- Race-Condition / plötzlich kein Geld -> freigeben
                     MySQL.update.await('UPDATE houses SET ownerid = 0, rent_start = NULL WHERE id = ?', { h.id })
                     log("INFO", ("Miete RaceFail -> Haus #%d freigegeben."):format(h.id))
                 end
@@ -526,14 +563,12 @@ CreateThread(function()
     log("INFO", ("RentWatcher aktiv: day=%d hour=%d minute=%d"):format(rentDay, rentHour, rentMinute))
 
     while true do
-        Wait(60 * 1000) -- 1x pro Minute prüfen
-
+        Wait(60 * 1000)
         local now = os.date('*t')
         if isRentTime(now) then
-            -- Nur einmal pro Tag bei passender Minute
             if lastRunYDay ~= now.yday or lastRunYear ~= now.year then
-                lastRunYDay  = now.yday
-                lastRunYear  = now.year
+                lastRunYDay = now.yday
+                lastRunYear = now.year
                 runRentCycle()
             end
         end

@@ -3,27 +3,24 @@
 local houseGarageTriggers = {}
 
 local function safeCoords(pos)
-    if not pos then return nil end
+    if not pos or type(pos) ~= "table" then return nil end
     if not pos.x or not pos.y or not pos.z then return nil end
     return vector3(tonumber(pos.x) + 0.0, tonumber(pos.y) + 0.0, tonumber(pos.z) + 0.0)
 end
 
 local function doDoorFx()
-    -- Wenn das Soundset nicht existiert, kannst du die Zeile auskommentieren.
+    -- Türsound; falls es nervt oder kein Soundset existiert, auskommentieren.
     PlaySoundFrontend(-1, "DOOR_CLOSE", "MP_PROPERTIES_ELEVATOR_DOORS", false)
 end
 
--- =========================================================
--- DEBUG: Loaded
--- =========================================================
 CreateThread(function()
     Wait(500)
     print("[HouseManager][CLIENT] houseManager_client.lua geladen.")
 end)
 
--- =========================================================
+-- =========================
 -- SYNC: Garage Trigger Marker
--- =========================================================
+-- =========================
 
 RegisterNetEvent('LCV:house:sync', function(list)
     houseGarageTriggers = {}
@@ -42,22 +39,21 @@ RegisterNetEvent('LCV:house:sync', function(list)
         local gz = tonumber(h.garage_trigger_z)
 
         if id and gx and gy and gz then
-    local rad = tonumber(h.radius) or 0.5  -- Fallback falls NULL
-    houseGarageTriggers[#houseGarageTriggers + 1] = {
-        id = id,
-        x = gx,
-        y = gy,
-        z = gz,
-        radius = rad
-    }
-end
-
+            local rad = tonumber(h.radius) or 0.5
+            houseGarageTriggers[#houseGarageTriggers + 1] = {
+                id = id,
+                x = gx,
+                y = gy,
+                z = gz,
+                radius = rad
+            }
+        end
     end
 
     print(("[HouseManager][CLIENT] Garage Trigger geladen: %d"):format(#houseGarageTriggers))
 end)
 
--- Beim Client-Start einmal anfragen
+-- Beim Client-Start einmal Daten holen
 CreateThread(function()
     Wait(2000)
     TriggerServerEvent('LCV:house:requestSync')
@@ -79,15 +75,14 @@ CreateThread(function()
                     sleep = 0
 
                     DrawMarker(
-    1,
-    g.x, g.y, g.z - 0.95,
-    0.0, 0.0, 0.0,
-    0.0, 0.0, 0.0,
-    g.radius, g.radius, 0.2,  -- Radius aus DB
-    255, 255, 0, 150,
-    false, true, 2, false, nil, nil, false
-)
-
+                        1,
+                        g.x, g.y, g.z - 0.95,
+                        0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0,
+                        g.radius, g.radius, 0.2,
+                        255, 255, 0, 150,
+                        false, true, 2, false, nil, nil, false
+                    )
                 end
             end
         end
@@ -96,9 +91,9 @@ CreateThread(function()
     end
 end)
 
--- =========================================================
--- HOUSE ENTER / LEAVE
--- =========================================================
+-- =========================
+-- ENTER / LEAVE
+-- =========================
 
 RegisterNetEvent('LCV:house:client:enter', function(data)
     if not data then return end

@@ -84,6 +84,7 @@ local function getAllFactionPerms()
 
     return rows
 end
+
 -- ================== CHARACTERS: HELPERS ==================
 
 local function getOnlineCharacterIds()
@@ -137,7 +138,7 @@ lib.callback.register('LCV:ADMIN:Characters:GetAll', function(source, _)
 
     local online = getOnlineCharacterIds()
 
-        for _, r in ipairs(rows) do
+    for _, r in ipairs(rows) do
         r.id               = tonumber(r.id) or 0
         r.account_id       = tonumber(r.account_id) or 0
         r.level            = tonumber(r.level) or 0
@@ -145,22 +146,17 @@ lib.callback.register('LCV:ADMIN:Characters:GetAll', function(source, _)
         r.is_locked        = (r.is_locked == 1 or r.is_locked == true)
         r.residence_permit = (r.residence_permit == 1 or r.residence_permit == true)
         r.past             = (r.past == 1 or r.past == true)
+        r.online           = online[r.id] == true
 
-        -- Online Flag
-        r.online = online[r.id] == true
-
-        -- Birthdate nur akzeptieren, wenn es wie YYYY-MM-DD aussieht
         if r.birthdate and type(r.birthdate) == "string" then
             local y, m, d = r.birthdate:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
             if y and m and d then
                 r.birthdate = string.format("%s-%s-%s", y, m, d)
             else
-                -- falls irgendwas komisch ist: lieber "-" anzeigen lassen
                 r.birthdate = nil
             end
         end
     end
-
 
     return { ok = true, characters = rows }
 end)
@@ -181,8 +177,8 @@ lib.callback.register('LCV:ADMIN:Characters:Update', function(source, data)
         return { ok = false, error = 'Ungültige ID' }
     end
 
-    local is_locked        = data.is_locked and 1 or 0
-    local residence_perm   = tonumber(data.residence_permit) or (data.residence_permit and 1 or 0)
+    local is_locked      = data.is_locked and 1 or 0
+    local residence_perm = data.residence_permit and 1 or 0
 
     local affected = MySQL.update.await([[
         UPDATE characters
@@ -194,7 +190,6 @@ lib.callback.register('LCV:ADMIN:Characters:Update', function(source, data)
         return { ok = false, error = 'Keine Änderung vorgenommen' }
     end
 
-    -- aktualisierten Datensatz zurückgeben
     local row = MySQL.single.await([[
         SELECT
             id,
@@ -210,30 +205,24 @@ lib.callback.register('LCV:ADMIN:Characters:Update', function(source, data)
         WHERE id = ?
     ]], { id })
 
-        for _, r in ipairs(rows) do
-        r.id               = tonumber(r.id) or 0
-        r.account_id       = tonumber(r.account_id) or 0
-        r.level            = tonumber(r.level) or 0
-        r.type             = tonumber(r.type) or 0
-        r.is_locked        = (r.is_locked == 1 or r.is_locked == true)
-        r.residence_permit = (r.residence_permit == 1 or r.residence_permit == true)
-        r.past             = (r.past == 1 or r.past == true)
+    if row then
+        row.id               = tonumber(row.id) or 0
+        row.account_id       = tonumber(row.account_id) or 0
+        row.level            = tonumber(row.level) or 0
+        row.type             = tonumber(row.type) or 0
+        row.is_locked        = (row.is_locked == 1 or row.is_locked == true)
+        row.residence_permit = (row.residence_permit == 1 or row.residence_permit == true)
+        row.past             = (row.past == 1 or row.past == true)
 
-        -- Online Flag
-        r.online = online[r.id] == true
-
-        -- Birthdate nur akzeptieren, wenn es wie YYYY-MM-DD aussieht
-        if r.birthdate and type(r.birthdate) == "string" then
-            local y, m, d = r.birthdate:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+        if row.birthdate and type(row.birthdate) == "string" then
+            local y, m, d = row.birthdate:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
             if y and m and d then
-                r.birthdate = string.format("%s-%s-%s", y, m, d)
+                row.birthdate = string.format("%s-%s-%s", y, m, d)
             else
-                -- falls irgendwas komisch ist: lieber "-" anzeigen lassen
-                r.birthdate = nil
+                row.birthdate = nil
             end
         end
     end
-
 
     return { ok = true, row = row }
 end)
@@ -250,7 +239,6 @@ lib.callback.register('LCV:ADMIN:Characters:Delete', function(source, data)
         return { ok = false, error = 'Ungültige ID' }
     end
 
-    -- nicht erlauben, wenn Char online ist
     local online = getOnlineCharacterIds()
     if online[id] then
         return { ok = false, error = 'Character ist aktuell online und kann nicht gelöscht werden.' }
@@ -280,7 +268,7 @@ RegisterNetEvent('LCV:ADMIN:Server:Show', function()
     TriggerClientEvent('LCV:ADMIN:Client:Show', src)
 end)
 
--- ================== GET ALL (für NUI-Tabelle) ==================
+-- ================== INTERACTIONS ==================
 
 lib.callback.register('LCV:ADMIN:Interactions:GetAll', function(source)
     if not hasAdminPermission(source, 10) then
@@ -291,7 +279,7 @@ lib.callback.register('LCV:ADMIN:Interactions:GetAll', function(source)
         SELECT id, name, description, type, x, y, z, radius, enabled, data
         FROM interaction_points
         ORDER BY id
-    ]], {}) or {}
+    ]]) or {}
 
     for _, row in ipairs(rows) do
         row.enabled = row.enabled == 1 or row.enabled == true
@@ -306,8 +294,6 @@ lib.callback.register('LCV:ADMIN:Interactions:GetAll', function(source)
 
     return { ok = true, interactions = rows }
 end)
-
--- ================== ADD ==================
 
 lib.callback.register('LCV:ADMIN:Interactions:Add', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -349,8 +335,6 @@ lib.callback.register('LCV:ADMIN:Interactions:Add', function(source, data)
 
     return { ok = true, id = id }
 end)
-
--- ================== UPDATE ==================
 
 lib.callback.register('LCV:ADMIN:Interactions:Update', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -399,8 +383,6 @@ lib.callback.register('LCV:ADMIN:Interactions:Update', function(source, data)
     return { ok = okUpdate, error = okUpdate and nil or 'Kein Datensatz geändert' }
 end)
 
--- ================== DELETE ==================
-
 lib.callback.register('LCV:ADMIN:Interactions:Delete', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -429,7 +411,7 @@ lib.callback.register('LCV:ADMIN:Interactions:Delete', function(source, data)
     return { ok = okDelete, error = okDelete and nil or 'Kein Datensatz gelöscht' }
 end)
 
--- ================== NPCs: GET ALL ==================
+-- ================== NPCs ==================
 
 lib.callback.register('LCV:ADMIN:Npcs:GetAll', function(source)
     if not hasAdminPermission(source, 10) then
@@ -441,23 +423,21 @@ lib.callback.register('LCV:ADMIN:Npcs:GetAll', function(source)
                interactable, autoGround, groundOffset, zOffset
         FROM npcs
         ORDER BY id
-    ]], {}) or {}
+    ]]) or {}
 
     for _, r in ipairs(rows) do
         r.interactable = (r.interactable == 1 or r.interactable == true)
-        r.autoGround = (r.autoGround == 1 or r.autoGround == true)
+        r.autoGround   = (r.autoGround == 1 or r.autoGround == true)
         r.groundOffset = tonumber(r.groundOffset) or 0.1
-        r.zOffset = tonumber(r.zOffset) or 0.0
-        r.x = tonumber(r.x) or 0.0
-        r.y = tonumber(r.y) or 0.0
-        r.z = tonumber(r.z) or 0.0
-        r.heading = tonumber(r.heading) or 0.0
+        r.zOffset      = tonumber(r.zOffset) or 0.0
+        r.x            = tonumber(r.x) or 0.0
+        r.y            = tonumber(r.y) or 0.0
+        r.z            = tonumber(r.z) or 0.0
+        r.heading      = tonumber(r.heading) or 0.0
     end
 
     return { ok = true, npcs = rows }
 end)
-
--- ================== NPCs: ADD ==================
 
 lib.callback.register('LCV:ADMIN:Npcs:Add', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -500,8 +480,6 @@ lib.callback.register('LCV:ADMIN:Npcs:Add', function(source, data)
 
     return { ok = true, id = id }
 end)
-
--- ================== NPCs: UPDATE ==================
 
 lib.callback.register('LCV:ADMIN:Npcs:Update', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -555,8 +533,6 @@ lib.callback.register('LCV:ADMIN:Npcs:Update', function(source, data)
     }
 end)
 
--- ================== NPCs: DELETE ==================
-
 lib.callback.register('LCV:ADMIN:Npcs:Delete', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -588,8 +564,6 @@ lib.callback.register('LCV:ADMIN:Npcs:Delete', function(source, data)
     }
 end)
 
--- ========== PLAYER INFO FÜR NAMETAGS ==========
-
 lib.callback.register('LCV:ADMIN:GetPlayerCharacter', function(_, targetId)
     targetId = tonumber(targetId)
     if not targetId then return nil end
@@ -609,9 +583,9 @@ lib.callback.register('LCV:ADMIN:GetPlayerCharacter', function(_, targetId)
     }
 end)
 
--- ========== FACTION STUFF ==========
+-- ================== FACTIONS ADMIN ==================
 
-lib.callback.register('LCV:ADMIN:Factions:GetCharactersSimple', function(source, data)
+lib.callback.register('LCV:ADMIN:Factions:GetCharactersSimple', function(source, _)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung', characters = {} }
     end
@@ -838,8 +812,6 @@ lib.callback.register('LCV:ADMIN:Factions:DeleteRank', function(source, data)
     return { ok = true, ranks = ranks }
 end)
 
--- ================== ADMIN: Permissions ==================
-
 lib.callback.register('LCV:ADMIN:Factions:GetPermissionSchema', function(source, _)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -953,6 +925,7 @@ lib.callback.register('LCV:ADMIN:FactionPerms:Delete', function(source, data)
     local perms = getAllFactionPerms()
     return { ok = true, perms = perms }
 end)
+
 -- ================== HOUSING SYSTEM ==================
 
 lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
@@ -972,28 +945,44 @@ lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
     ]]) or {}
 
     for _, h in ipairs(rows) do
-        h.id = tonumber(h.id) or 0
-        h.ownerid = tonumber(h.ownerid) or 0
-        h.entry_x = tonumber(h.entry_x) or 0.0
-        h.entry_y = tonumber(h.entry_y) or 0.0
-        h.entry_z = tonumber(h.entry_z) or 0.0
-        h.garage_trigger_x = tonumber(h.garage_trigger_x) or nil
-        h.garage_trigger_y = tonumber(h.garage_trigger_y) or nil
-        h.garage_trigger_z = tonumber(h.garage_trigger_z) or nil
-        h.garage_x = tonumber(h.garage_x) or nil
-        h.garage_y = tonumber(h.garage_y) or nil
-        h.garage_z = tonumber(h.garage_z) or nil
-        h.price = tonumber(h.price) or 0
-        h.rent = tonumber(h.rent) or 0
-        h.ipl = tonumber(h.ipl) or nil
-        h.lock_state = (tonumber(h.lock_state) == 1) and 1 or 0
+        h.id                 = tonumber(h.id) or 0
+        h.ownerid            = tonumber(h.ownerid) or 0
+        h.entry_x            = tonumber(h.entry_x) or 0.0
+        h.entry_y            = tonumber(h.entry_y) or 0.0
+        h.entry_z            = tonumber(h.entry_z) or 0.0
+        h.garage_trigger_x   = tonumber(h.garage_trigger_x) or nil
+        h.garage_trigger_y   = tonumber(h.garage_trigger_y) or nil
+        h.garage_trigger_z   = tonumber(h.garage_trigger_z) or nil
+        h.garage_x           = tonumber(h.garage_x) or nil
+        h.garage_y           = tonumber(h.garage_y) or nil
+        h.garage_z           = tonumber(h.garage_z) or nil
+        h.price              = tonumber(h.price) or 0
+        h.rent               = tonumber(h.rent) or 0
+        h.ipl                = tonumber(h.ipl) or nil
+        h.lock_state         = (tonumber(h.lock_state) == 1) and 1 or 0
+
+        h.hotel              = tonumber(h.hotel) or 0
+        h.apartments         = tonumber(h.apartments) or 0
+        h.garage_size        = tonumber(h.garage_size) or 0
+
+        h.allowed_bike       = tonumber(h.allowed_bike) == 1
+        h.allowed_motorbike  = tonumber(h.allowed_motorbike) == 1
+        h.allowed_car        = tonumber(h.allowed_car) == 1
+        h.allowed_truck      = tonumber(h.allowed_truck) == 1
+        h.allowed_plane      = tonumber(h.allowed_plane) == 1
+        h.allowed_helicopter = tonumber(h.allowed_helicopter) == 1
+        h.allowed_boat       = tonumber(h.allowed_boat) == 1
+
+        h.maxkeys            = tonumber(h.maxkeys) or 0
+        -- h.keys bleibt JSON / wird im UI nicht direkt genutzt
+        h.pincode            = h.pincode
 
         local rs = h.rent_start
         if rs == "0000-00-00 00:00:00" or rs == "" then
             h.rent_start = nil
         end
 
-        local hasOwner = h.ownerid and h.ownerid > 0
+        local hasOwner     = h.ownerid and h.ownerid > 0
         local hasRentStart = h.rent_start ~= nil
 
         if not hasOwner then
@@ -1010,7 +999,6 @@ lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
     return { ok = true, houses = rows }
 end)
 
-
 lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -1020,10 +1008,23 @@ lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
         return { ok = false, error = 'Name + Eingang sind erforderlich.' }
     end
 
-    local name = tostring(data.name)
+    local name    = tostring(data.name)
     local ownerid = tonumber(data.ownerid) or 0
-    local radius = tonumber(data.radius) or 0.5
+    local radius  = tonumber(data.radius) or 0.5
 
+    local hotel        = (tonumber(data.hotel) == 1) and 1 or 0
+    local apartments   = tonumber(data.apartments) or 0
+    local garage_size  = tonumber(data.garage_size) or 0
+    local maxkeys      = tonumber(data.maxkeys) or 0
+    local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
+
+    local allowed_bike        = data.allowed_bike and 1 or 0
+    local allowed_motorbike   = data.allowed_motorbike and 1 or 0
+    local allowed_car         = data.allowed_car and 1 or 0
+    local allowed_truck       = data.allowed_truck and 1 or 0
+    local allowed_plane       = data.allowed_plane and 1 or 0
+    local allowed_helicopter  = data.allowed_helicopter and 1 or 0
+    local allowed_boat        = data.allowed_boat and 1 or 0
 
     local id = MySQL.insert.await([[
         INSERT INTO houses
@@ -1031,8 +1032,17 @@ lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
              entry_x, entry_y, entry_z,
              garage_trigger_x, garage_trigger_y, garage_trigger_z,
              garage_x, garage_y, garage_z,
-             price, rent, ipl, lock_state)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             price, rent, ipl, lock_state,
+             hotel, apartments, garage_size,
+             allowed_bike, allowed_motorbike, allowed_car,
+             allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
+             maxkeys, `keys`, pincode)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?)
+
     ]], {
         name,
         ownerid > 0 and ownerid or nil,
@@ -1048,74 +1058,76 @@ lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
         tonumber(data.price) or 0,
         tonumber(data.rent) or 0,
         tonumber(data.ipl) or nil,
-        1
+        hotel,
+        apartments,
+        garage_size,
+        allowed_bike, allowed_motorbike, allowed_car,
+        allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
+        maxkeys,
+        nil, -- `keys`
+        pincode
     })
 
     if not id or id <= 0 then
         return { ok = false, error = 'Insert fehlgeschlagen' }
     end
 
-    local houseId = id
-    local dataJson = hmJsonEncode({ houseid = houseId })
+    local houseId  = id
+    local dataJson = json.encode({ houseid = houseId })
 
     -- ENTRY Interaction
     MySQL.insert.await([[
         INSERT INTO interaction_points
-    (name, description, type, x, y, z, radius, enabled, data)
-VALUES ('HOUSE', ?, 'house', ?, ?, ?, ?, 1, ?)
-
+            (name, description, type, x, y, z, radius, enabled, data)
+        VALUES ('HOUSE', ?, 'house', ?, ?, ?, ?, 1, ?)
     ]], {
-    name,
-    tonumber(data.entry_x) or 0.0,
-    tonumber(data.entry_y) or 0.0,
-    tonumber(data.entry_z) or 0.0,
-    radius,
-    dataJson
-}
-)
+        name,
+        tonumber(data.entry_x) or 0.0,
+        tonumber(data.entry_y) or 0.0,
+        tonumber(data.entry_z) or 0.0,
+        radius,
+        dataJson
+    })
 
-    -- GARAGE Interaction (wenn Trigger vorhanden)
+    -- GARAGE Interaction
     if data.garage_trigger_x and data.garage_trigger_y and data.garage_trigger_z then
         MySQL.insert.await([[
             INSERT INTO interaction_points
-    (name, description, type, x, y, z, radius, enabled, data)
-VALUES ('HOUSE_GARAGE', ?, 'garage', ?, ?, ?, ?, 1, ?)
-
+                (name, description, type, x, y, z, radius, enabled, data)
+            VALUES ('HOUSE_GARAGE', ?, 'garage', ?, ?, ?, ?, 1, ?)
         ]], {
-    name,
-    tonumber(data.garage_trigger_x),
-    tonumber(data.garage_trigger_y),
-    tonumber(data.garage_trigger_z),
-    radius,
-    dataJson
-}
-)
+            name,
+            tonumber(data.garage_trigger_x) or 0.0,
+            tonumber(data.garage_trigger_y) or 0.0,
+            tonumber(data.garage_trigger_z) or 0.0,
+            radius,
+            dataJson
+        })
     end
 
-    -- EXIT Interaction (über house_ipl.exit_x/y/z)
+    -- EXIT Interaction via IPL
     if data.ipl then
         local ipl = MySQL.single.await('SELECT exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { tonumber(data.ipl) })
-        if ipl and ipl.exit_x and ipl.exit_y and ipl.exit_z then
+        if ipl then
             MySQL.insert.await([[
                 INSERT INTO interaction_points
-    (name, description, type, x, y, z, radius, enabled, data)
-VALUES ('EXIT_HOUSE', ?, 'house', ?, ?, ?, ?, 1, ?)
-
+                    (name, description, type, x, y, z, radius, enabled, data)
+                VALUES ('EXIT_HOUSE', ?, 'house_exit', ?, ?, ?, ?, 1, ?)
             ]], {
-    name,
-    tonumber(ipl.exit_x),
-    tonumber(ipl.exit_y),
-    tonumber(ipl.exit_z),
-    radius,
-    dataJson
-}
-)
+                name,
+                tonumber(ipl.exit_x) or 0.0,
+                tonumber(ipl.exit_y) or 0.0,
+                tonumber(ipl.exit_z) or 0.0,
+                radius,
+                dataJson
+            })
         end
     end
 
     TriggerEvent('lcv:interaction:server:reloadPoints')
     TriggerEvent('LCV:house:forceSync')
-    return { ok = true, id = houseId }
+
+    return { ok = true }
 end)
 
 lib.callback.register('LCV:ADMIN:Houses:Update', function(source, data)
@@ -1124,7 +1136,6 @@ lib.callback.register('LCV:ADMIN:Houses:Update', function(source, data)
     end
 
     local id = tonumber(data and data.id)
-    
     if not id then
         return { ok = false, error = 'Ungültige ID' }
     end
@@ -1135,14 +1146,33 @@ lib.callback.register('LCV:ADMIN:Houses:Update', function(source, data)
     end
 
     local ownerid = tonumber(data.ownerid) or 0
+    local radius  = tonumber(data.radius) or 0.5
 
-    MySQL.update.await([[
+    local hotel        = (tonumber(data.hotel) == 1) and 1 or 0
+    local apartments   = tonumber(data.apartments) or 0
+    local garage_size  = tonumber(data.garage_size) or 0
+    local maxkeys      = tonumber(data.maxkeys) or 0
+    local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
+
+    local allowed_bike        = data.allowed_bike and 1 or 0
+    local allowed_motorbike   = data.allowed_motorbike and 1 or 0
+    local allowed_car         = data.allowed_car and 1 or 0
+    local allowed_truck       = data.allowed_truck and 1 or 0
+    local allowed_plane       = data.allowed_plane and 1 or 0
+    local allowed_helicopter  = data.allowed_helicopter and 1 or 0
+    local allowed_boat        = data.allowed_boat and 1 or 0
+
+    local affected = MySQL.update.await([[
         UPDATE houses
         SET name = ?, ownerid = ?,
             entry_x = ?, entry_y = ?, entry_z = ?,
             garage_trigger_x = ?, garage_trigger_y = ?, garage_trigger_z = ?,
             garage_x = ?, garage_y = ?, garage_z = ?,
-            price = ?, rent = ?, ipl = ?
+            price = ?, rent = ?, ipl = ?,
+            hotel = ?, apartments = ?, garage_size = ?,
+            allowed_bike = ?, allowed_motorbike = ?, allowed_car = ?,
+            allowed_truck = ?, allowed_plane = ?, allowed_helicopter = ?, allowed_boat = ?,
+            maxkeys = ?, pincode = ?
         WHERE id = ?
     ]], {
         name,
@@ -1159,62 +1189,68 @@ lib.callback.register('LCV:ADMIN:Houses:Update', function(source, data)
         tonumber(data.price) or 0,
         tonumber(data.rent) or 0,
         tonumber(data.ipl) or nil,
+        hotel,
+        apartments,
+        garage_size,
+        allowed_bike, allowed_motorbike, allowed_car,
+        allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
+        maxkeys,
+        pincode,
         id
     })
 
-    local dataJson = hmJsonEncode({ houseid = id })
-    local radius = tonumber(data.radius) or 0.5
-
-
-    -- ENTRY Update
-    MySQL.update.await([[
-    UPDATE interaction_points
-    SET description = ?, x = ?, y = ?, z = ?, radius = ?
-    WHERE name = 'HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
-]], {
-    name,
-    tonumber(data.entry_x) or 0.0,
-    tonumber(data.entry_y) or 0.0,
-    tonumber(data.entry_z) or 0.0,
-    radius,
-    id
-})
-
-
-    -- GARAGE Update
-    MySQL.update.await([[
-    UPDATE interaction_points
-    SET description = ?, x = ?, y = ?, z = ?, radius = ?
-    WHERE name = 'HOUSE_GARAGE' AND JSON_EXTRACT(data, '$.houseid') = ?
-]], {
-    name,
-    tonumber(data.garage_trigger_x) or 0.0,
-    tonumber(data.garage_trigger_y) or 0.0,
-    tonumber(data.garage_trigger_z) or 0.0,
-    radius,
-    id
-})
-
-
-    -- EXIT Update (frisches ipl lesen)
-    if data.ipl then
-    local ipl = MySQL.single.await('SELECT exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { tonumber(data.ipl) })
-    if ipl and ipl.exit_x and ipl.exit_y and ipl.exit_z then
-        MySQL.update.await([[
-            UPDATE interaction_points
-            SET description = ?, x = ?, y = ?, z = ?, radius = ?
-            WHERE name = 'EXIT_HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
-        ]], {
-            name,
-            tonumber(ipl.exit_x) or 0.0,
-            tonumber(ipl.exit_y) or 0.0,
-            tonumber(ipl.exit_z) or 0.0,
-            radius,
-            id
-        })
+    if not affected or affected < 1 then
+        return { ok = false, error = 'Update fehlgeschlagen.' }
     end
-end
 
+    local dataJson = hmJsonEncode({ houseid = id })
+
+    -- ENTRY
+    MySQL.update.await([[
+        UPDATE interaction_points
+        SET description = ?, x = ?, y = ?, z = ?, radius = ?
+        WHERE name = 'HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
+    ]], {
+        name,
+        tonumber(data.entry_x) or 0.0,
+        tonumber(data.entry_y) or 0.0,
+        tonumber(data.entry_z) or 0.0,
+        radius,
+        id
+    })
+
+    -- GARAGE
+    MySQL.update.await([[
+        UPDATE interaction_points
+        SET description = ?, x = ?, y = ?, z = ?, radius = ?
+        WHERE name = 'HOUSE_GARAGE' AND JSON_EXTRACT(data, '$.houseid') = ?
+    ]], {
+        name,
+        tonumber(data.garage_trigger_x) or 0.0,
+        tonumber(data.garage_trigger_y) or 0.0,
+        tonumber(data.garage_trigger_z) or 0.0,
+        radius,
+        id
+    })
+
+    -- EXIT via IPL
+    if data.ipl then
+        local ipl = MySQL.single.await('SELECT exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { tonumber(data.ipl) })
+        if ipl and ipl.exit_x and ipl.exit_y and ipl.exit_z then
+            MySQL.update.await([[
+                UPDATE interaction_points
+                SET description = ?, x = ?, y = ?, z = ?, radius = ?
+                WHERE name = 'EXIT_HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
+            ]], {
+                name,
+                tonumber(ipl.exit_x) or 0.0,
+                tonumber(ipl.exit_y) or 0.0,
+                tonumber(ipl.exit_z) or 0.0,
+                radius,
+                id
+            })
+        end
+    end
 
     TriggerEvent('lcv:interaction:server:reloadPoints')
     TriggerEvent('LCV:house:forceSync')
@@ -1231,7 +1267,6 @@ lib.callback.register('LCV:ADMIN:Houses:Delete', function(source, data)
         return { ok = false, error = 'Ungültige ID' }
     end
 
-    -- Interactions zu diesem Haus löschen
     MySQL.update.await([[
         DELETE FROM interaction_points
         WHERE JSON_EXTRACT(data, '$.houseid') = ?
@@ -1250,6 +1285,21 @@ lib.callback.register('LCV:ADMIN:Houses:Delete', function(source, data)
     return { ok = true }
 end)
 
+lib.callback.register('LCV:ADMIN:Houses:ResetPincode', function(source, data)
+    if not hasAdminPermission(source, 10) then
+        return { ok = false, error = 'Keine Berechtigung' }
+    end
+
+    local id = tonumber(data and data.id)
+    if not id then
+        return { ok = false, error = 'Ungültige ID' }
+    end
+
+    MySQL.update.await('UPDATE houses SET pincode = NULL WHERE id = ?', { id })
+    return { ok = true }
+end)
+
+-- Teleport vom Client (NUI ruft Client, Client triggert dieses Event)
 RegisterNetEvent('LCV:ADMIN:Houses:Teleport', function(id, x, y, z)
     local src = source
     if not hasAdminPermission(src, 10) then return end
@@ -1264,23 +1314,24 @@ RegisterNetEvent('LCV:ADMIN:Houses:Teleport', function(id, x, y, z)
     end
 end)
 
+-- ================== HOUSE IPL ==================
+
 lib.callback.register('LCV:ADMIN:HousesIPL:GetAll', function(source)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung', ipls = {} }
     end
 
     local rows = MySQL.query.await([[
-    SELECT id, ipl_name, ipl, posx, posy, posz, exit_x, exit_y, exit_z
-    FROM house_ipl
-    ORDER BY id ASC
-]], {}) or {}
-
+        SELECT id, ipl_name, ipl, posx, posy, posz, exit_x, exit_y, exit_z
+        FROM house_ipl
+        ORDER BY id ASC
+    ]]) or {}
 
     for _, r in ipairs(rows) do
-        r.id = tonumber(r.id) or 0
-        r.posx = tonumber(r.posx) or 0.0
-        r.posy = tonumber(r.posy) or 0.0
-        r.posz = tonumber(r.posz) or 0.0
+        r.id     = tonumber(r.id) or 0
+        r.posx   = tonumber(r.posx) or 0.0
+        r.posy   = tonumber(r.posy) or 0.0
+        r.posz   = tonumber(r.posz) or 0.0
         r.exit_x = tonumber(r.exit_x) or 0.0
         r.exit_y = tonumber(r.exit_y) or 0.0
         r.exit_z = tonumber(r.exit_z) or 0.0
@@ -1302,7 +1353,7 @@ lib.callback.register('LCV:ADMIN:HousesIPL:Add', function(source, data)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
         tostring(data.ipl_name),
-        tostring(data.ipl or nil),
+        tostring(data.ipl or ''),
         tonumber(data.posx) or 0.0,
         tonumber(data.posy) or 0.0,
         tonumber(data.posz) or 0.0,
@@ -1332,10 +1383,9 @@ lib.callback.register('LCV:ADMIN:HousesIPL:Update', function(source, data)
         UPDATE house_ipl
         SET ipl_name = ?, ipl = ?, posx = ?, posy = ?, posz = ?, exit_x = ?, exit_y = ?, exit_z = ?
         WHERE id = ?
-
     ]], {
         tostring(data.ipl_name or ''),
-        tostring(data.ipl or nil),
+        tostring(data.ipl or ''),
         tonumber(data.posx) or 0.0,
         tonumber(data.posy) or 0.0,
         tonumber(data.posz) or 0.0,
@@ -1345,7 +1395,7 @@ lib.callback.register('LCV:ADMIN:HousesIPL:Update', function(source, data)
         id
     })
 
-    -- EXIT_HOUSE-Interactions für Houses mit diesem IPL aktualisieren
+    -- EXIT_HOUSE aktualisieren für verknüpfte Häuser
     local houses = MySQL.query.await('SELECT id FROM houses WHERE ipl = ?', { id }) or {}
     if #houses > 0 then
         for _, h in ipairs(houses) do
@@ -1416,7 +1466,7 @@ RegisterNetEvent('LCV:ADMIN:Npcs:Teleport', function(id, x, y, z)
     end
 end)
 
--- ================== TELEPORT ==================
+-- ================== INTERACTIONS: TELEPORT ==================
 
 RegisterNetEvent('LCV:ADMIN:Interactions:Teleport', function(id, x, y, z)
     local src = source
@@ -1432,7 +1482,7 @@ RegisterNetEvent('LCV:ADMIN:Interactions:Teleport', function(id, x, y, z)
     end
 end)
 
--- ================== BLIPS: GET ALL ==================
+-- ================== BLIPS ==================
 
 lib.callback.register('LCV:ADMIN:Blips:GetAll', function(source)
     if not hasAdminPermission(source, 10) then
@@ -1444,7 +1494,7 @@ lib.callback.register('LCV:ADMIN:Blips:GetAll', function(source)
                shortRange, display, category, visiblefor, enabled
         FROM blips
         ORDER BY id
-    ]], {}) or {}
+    ]]) or {}
 
     for _, r in ipairs(rows) do
         r.id         = tonumber(r.id) or 0
@@ -1462,8 +1512,6 @@ lib.callback.register('LCV:ADMIN:Blips:GetAll', function(source)
 
     return { ok = true, blips = rows }
 end)
-
--- ================== BLIPS: ADD ==================
 
 lib.callback.register('LCV:ADMIN:Blips:Add', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -1509,8 +1557,6 @@ lib.callback.register('LCV:ADMIN:Blips:Add', function(source, data)
 
     return { ok = true, id = id }
 end)
-
--- ================== BLIPS: UPDATE ==================
 
 lib.callback.register('LCV:ADMIN:Blips:Update', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -1559,8 +1605,6 @@ lib.callback.register('LCV:ADMIN:Blips:Update', function(source, data)
     return { ok = okUpdate, error = okUpdate and nil or 'Kein Datensatz geändert' }
 end)
 
--- ================== BLIPS: DELETE ==================
-
 lib.callback.register('LCV:ADMIN:Blips:Delete', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung' }
@@ -1588,8 +1632,6 @@ lib.callback.register('LCV:ADMIN:Blips:Delete', function(source, data)
     return { ok = okDelete, error = okDelete and nil or 'Kein Datensatz gelöscht' }
 end)
 
--- ================== BLIPS: GET PLAYER POS ==================
-
 lib.callback.register('LCV:ADMIN:Blips:GetPlayerPos', function(source)
     local ped = GetPlayerPed(source)
     if not ped or ped == 0 or not DoesEntityExist(ped) then
@@ -1605,8 +1647,6 @@ lib.callback.register('LCV:ADMIN:Blips:GetPlayerPos', function(source)
     }
 end)
 
--- ================== BLIPS: TELEPORT ==================
-
 RegisterNetEvent('LCV:ADMIN:Blips:Teleport', function(id, x, y, z)
     local src = source
     if not hasAdminPermission(src, 10) then return end
@@ -1621,7 +1661,7 @@ RegisterNetEvent('LCV:ADMIN:Blips:Teleport', function(id, x, y, z)
     end
 end)
 
--- ================== TELEPORT TO WAYPOINT ==================
+-- ================== TELEPORT TO WAYPOINT / FREI ==================
 
 RegisterNetEvent('LCV:ADMIN:TeleportToWaypoint', function(x, y, z)
     local src = source
@@ -1637,14 +1677,28 @@ RegisterNetEvent('LCV:ADMIN:TeleportToWaypoint', function(x, y, z)
     end
 end)
 
--- ================== FACTIONS: ADMIN PANEL ==================
+RegisterNetEvent('LCV:ADMIN:Teleport:Coords', function(x, y, z)
+    local src = source
+    if not hasAdminPermission(src, 10) then return end
+
+    x, y, z = tonumber(x), tonumber(y), tonumber(z)
+    if not x or not y or not z then return end
+
+    local ped = GetPlayerPed(src)
+    if ped ~= 0 then
+        SetEntityCoords(ped, x + 0.0, y + 0.0, z + 0.0, false, false, false, true)
+        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, { x = x, y = y, z = z })
+    end
+end)
+
+-- ================== FACTIONS: PANEL MAIN ==================
 
 lib.callback.register('LCV:ADMIN:Factions:GetAll', function(source, data)
     if not hasAdminPermission(source, 10) then
         return { ok = false, error = 'Keine Berechtigung', factions = {} }
     end
 
-    local query = data and data.query or ''
+    local query    = data and data.query or ''
     local factions = exports['factionManager']:GetAllFactions(query) or {}
 
     return { ok = true, factions = factions }
@@ -1703,7 +1757,7 @@ lib.callback.register('LCV:ADMIN:Factions:Create', function(source, data)
         pcall(function()
             exports['factionManager']:UpdateFaction(id, {
                 duty_required = duty_required,
-                is_gang = is_gang
+                is_gang       = is_gang
             })
         end)
     end
@@ -1741,9 +1795,9 @@ lib.callback.register('LCV:ADMIN:Factions:Update', function(source, data)
         return { ok = false, error = err or 'Keine Änderung vorgenommen' }
     end
 
-    local faction = exports['factionManager']:GetFactionById(factionId)
-
+    local faction     = exports['factionManager']:GetFactionById(factionId)
     local actorCharId = getCharId(source)
+
     exports['factionManager']:LogFactionAction(factionId, actorCharId, nil, 'update_faction', {
         fields = updateData
     })
@@ -1769,8 +1823,7 @@ lib.callback.register('LCV:ADMIN:Factions:Delete', function(source, data)
     return { ok = true }
 end)
 
-
--- ===== CALLBACK: GET DUTY DATA =====
+-- ===== HOME: DUTY INFO =====
 
 lib.callback.register('LCV:ADMIN:Home:GetDutyData', function(source, _)
     if not hasAdminPermission(source, 1) then
@@ -1788,8 +1841,8 @@ lib.callback.register('LCV:ADMIN:Home:GetDutyData', function(source, _)
     for _, f in ipairs(dutyFactions) do
         if f.onDuty then
             currentDuty[#currentDuty+1] = {
-                id = f.id,
-                name = f.name,
+                id    = f.id,
+                name  = f.name,
                 label = f.label
             }
         end
@@ -1801,9 +1854,6 @@ lib.callback.register('LCV:ADMIN:Home:GetDutyData', function(source, _)
         currentDuty  = currentDuty
     }
 end)
-
-
--- ===== CALLBACK: SET DUTY (NEU, FLOW 2 FIX) =====
 
 lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
     if not hasAdminPermission(source, 1) then
@@ -1834,19 +1884,4 @@ lib.callback.register('LCV:ADMIN:Home:SetDuty', function(source, data)
         dutyFactions = dutyFactions or {},
         currentDuty  = currentDuty or {}
     }
-end)
--- ================== TELEPORT: FREIE KOORDINATEN ==================
-
-RegisterNetEvent('LCV:ADMIN:Teleport:Coords', function(x, y, z)
-    local src = source
-    if not hasAdminPermission(src, 10) then return end
-
-    x, y, z = tonumber(x), tonumber(y), tonumber(z)
-    if not x or not y or not z then return end
-
-    local ped = GetPlayerPed(src)
-    if ped ~= 0 then
-        SetEntityCoords(ped, x + 0.0, y + 0.0, z + 0.0, false, false, false, true)
-        TriggerClientEvent('LCV:ADMIN:Interactions:NotifyTeleport', src, { x = x, y = y, z = z })
-    end
 end)

@@ -1064,6 +1064,29 @@ RegisterNUICallback('LCV:ADMIN:Teleport:Coords', function(data, cb)
     cb({ ok = true })
 end)
 
+RegisterNUICallback('LCV:ADMIN:Houses:GetStreetName', function(data, cb)
+    local ped = PlayerPedId()
+    if not ped or ped == 0 or not DoesEntityExist(ped) then
+        cb({ ok = false, error = 'no_ped' })
+        return
+    end
+
+    local coords = GetEntityCoords(ped)
+    local streetHash, crossHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
+    local streetName = GetStreetNameFromHashKey(streetHash)
+    cb({ ok = true, street = streetName or "" })
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:ResetPincode', function(data, cb)
+    if not data or not data.id then
+        cb({ ok = false, error = 'missing_id' })
+        return
+    end
+
+    lib.callback('LCV:ADMIN:Houses:ResetPincode', false, function(result)
+        cb(result or { ok = false, error = 'no_response' })
+    end, data)
+end)
 
 -- Cleanup
 AddEventHandler('onResourceStop', function(res)

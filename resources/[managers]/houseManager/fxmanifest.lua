@@ -8,7 +8,7 @@ version '1.0.0'
 description 'LyraCityV - Housing Management'
 
 server_scripts {
-    '@oxmysql/lib/MySQL.lua',    -- oxmysql Binding
+    '@oxmysql/lib/MySQL.lua',
     'server/houseManager.lua',
 }
 
@@ -21,6 +21,8 @@ server_exports {
     'getlockstate',
     'getrent',
     'getprice',
+    'getpincode',
+    'getanzahlapartments',
 }
 
 dependency 'oxmysql'
