@@ -368,6 +368,15 @@ Vue.component("tab-houses", {
       this.editDialog.error = null;
       this.editDialog.busy = false;
 
+      // Lokaler Helper: robustes Boolean + Default
+      const asBool = (val, def = false) => {
+        if (val === null || typeof val === "undefined") return def;
+        if (typeof val === "boolean") return val;
+        if (typeof val === "number") return val === 1;
+        const v = String(val).trim().toLowerCase();
+        return v === "1" || v === "true" || v === "yes" || v === "on";
+      };
+
       this.editDialog.form = {
         id: h.id,
 
@@ -392,21 +401,22 @@ Vue.component("tab-houses", {
         garage_y: h.garage_y,
         garage_z: h.garage_z,
 
-        radius: h.radius || 0.5,
+        // vom Server kommt interaction_radius, fallback auf 0.5
+        radius: h.interaction_radius || h.radius || 0.5,
 
         // Hotel & Apartments
-        hotel: this.toBool(h.hotel),
+        hotel: asBool(h.hotel, false),
         apartments: h.apartments || 0,
         garage_size: h.garage_size || 0,
 
-        // Allowed Vehicles
-        allowed_bike: this.toBool(h.allowed_bike),
-        allowed_motorbike: this.toBool(h.allowed_motorbike),
-        allowed_car: this.toBool(h.allowed_car),
-        allowed_truck: this.toBool(h.allowed_truck),
-        allowed_plane: this.toBool(h.allowed_plane),
-        allowed_helicopter: this.toBool(h.allowed_helicopter),
-        allowed_boat: this.toBool(h.allowed_boat),
+        // Allowed Vehicles (Defaults wie im Add-Form)
+        allowed_bike: asBool(h.allowed_bike, true),
+        allowed_motorbike: asBool(h.allowed_motorbike, true),
+        allowed_car: asBool(h.allowed_car, true),
+        allowed_truck: asBool(h.allowed_truck, false),
+        allowed_plane: asBool(h.allowed_plane, false),
+        allowed_helicopter: asBool(h.allowed_helicopter, false),
+        allowed_boat: asBool(h.allowed_boat, false),
 
         maxkeys: h.maxkeys || 0,
         pincode: h.pincode || "",

@@ -27,6 +27,20 @@ local function hmJsonEncode(tbl)
     return ok and res or '{}'
 end
 
+local function asBool(v)
+    if v == nil then return false end
+    local t = type(v)
+    if t == "boolean" then
+        return v
+    elseif t == "number" then
+        return v == 1
+    elseif t == "string" then
+        v = v:lower()
+        return (v == "1" or v == "true" or v == "yes" or v == "on")
+    end
+    return false
+end
+
 -- ================== ADMIN PERMISSION SYSTEM ==================
 
 local function loadFactionPermissionSchemaFromDB()
@@ -961,17 +975,18 @@ lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
         h.ipl                = tonumber(h.ipl) or nil
         h.lock_state         = (tonumber(h.lock_state) == 1) and 1 or 0
 
-        h.hotel              = tonumber(h.hotel) == 1
-        h.apartments         = tonumber(h.apartments) or 0
-        h.garage_size        = tonumber(h.garage_size) or 0
+        h.hotel              = asBool(h.hotel)
+h.apartments         = tonumber(h.apartments) or 0
+h.garage_size        = tonumber(h.garage_size) or 0
 
-        h.allowed_bike       = tonumber(h.allowed_bike) == 1
-        h.allowed_motorbike  = tonumber(h.allowed_motorbike) == 1
-        h.allowed_car        = tonumber(h.allowed_car) == 1
-        h.allowed_truck      = tonumber(h.allowed_truck) == 1
-        h.allowed_plane      = tonumber(h.allowed_plane) == 1
-        h.allowed_helicopter = tonumber(h.allowed_helicopter) == 1
-        h.allowed_boat       = tonumber(h.allowed_boat) == 1
+h.allowed_bike       = asBool(h.allowed_bike)
+h.allowed_motorbike  = asBool(h.allowed_motorbike)
+h.allowed_car        = asBool(h.allowed_car)
+h.allowed_truck      = asBool(h.allowed_truck)
+h.allowed_plane      = asBool(h.allowed_plane)
+h.allowed_helicopter = asBool(h.allowed_helicopter)
+h.allowed_boat       = asBool(h.allowed_boat)
+
 
         h.maxkeys            = tonumber(h.maxkeys) or 0
         -- h.keys bleibt JSON / wird im UI nicht direkt genutzt
@@ -995,7 +1010,6 @@ lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
 
         h.interaction_radius = tonumber(h.interaction_radius) or 0.5
     end
-
     return { ok = true, houses = rows }
 end)
 
@@ -1018,13 +1032,14 @@ lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
     local maxkeys      = tonumber(data.maxkeys) or 0
     local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
 
-    local allowed_bike        = data.allowed_bike and 1 or 0
-    local allowed_motorbike   = data.allowed_motorbike and 1 or 0
-    local allowed_car         = data.allowed_car and 1 or 0
-    local allowed_truck       = data.allowed_truck and 1 or 0
-    local allowed_plane       = data.allowed_plane and 1 or 0
-    local allowed_helicopter  = data.allowed_helicopter and 1 or 0
-    local allowed_boat        = data.allowed_boat and 1 or 0
+    local allowed_bike        = (tonumber(data.allowed_bike) == 1) and 1 or 0
+local allowed_motorbike   = (tonumber(data.allowed_motorbike) == 1) and 1 or 0
+local allowed_car         = (tonumber(data.allowed_car) == 1) and 1 or 0
+local allowed_truck       = (tonumber(data.allowed_truck) == 1) and 1 or 0
+local allowed_plane       = (tonumber(data.allowed_plane) == 1) and 1 or 0
+local allowed_helicopter  = (tonumber(data.allowed_helicopter) == 1) and 1 or 0
+local allowed_boat        = (tonumber(data.allowed_boat) == 1) and 1 or 0
+
 
     local id = MySQL.insert.await([[
         INSERT INTO houses
@@ -1154,13 +1169,14 @@ lib.callback.register('LCV:ADMIN:Houses:Update', function(source, data)
     local maxkeys      = tonumber(data.maxkeys) or 0
     local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
 
-    local allowed_bike        = data.allowed_bike and 1 or 0
-    local allowed_motorbike   = data.allowed_motorbike and 1 or 0
-    local allowed_car         = data.allowed_car and 1 or 0
-    local allowed_truck       = data.allowed_truck and 1 or 0
-    local allowed_plane       = data.allowed_plane and 1 or 0
-    local allowed_helicopter  = data.allowed_helicopter and 1 or 0
-    local allowed_boat        = data.allowed_boat and 1 or 0
+    local allowed_bike        = (tonumber(data.allowed_bike) == 1) and 1 or 0
+local allowed_motorbike   = (tonumber(data.allowed_motorbike) == 1) and 1 or 0
+local allowed_car         = (tonumber(data.allowed_car) == 1) and 1 or 0
+local allowed_truck       = (tonumber(data.allowed_truck) == 1) and 1 or 0
+local allowed_plane       = (tonumber(data.allowed_plane) == 1) and 1 or 0
+local allowed_helicopter  = (tonumber(data.allowed_helicopter) == 1) and 1 or 0
+local allowed_boat        = (tonumber(data.allowed_boat) == 1) and 1 or 0
+
 
     local affected = MySQL.update.await([[
         UPDATE houses
