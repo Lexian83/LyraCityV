@@ -961,10 +961,15 @@ lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
     end
 
     local rows = MySQL.query.await([[
-        SELECT *
-        FROM houses
-        ORDER BY id ASC
-    ]], {}) or {}
+        SELECT 
+            h.*,
+            i.radius AS interaction_radius
+        FROM houses h
+        LEFT JOIN interaction_points i
+          ON i.name = 'HOUSE'
+         AND JSON_EXTRACT(i.data, '$.houseid') = h.id
+        ORDER BY h.id ASC
+    ]]) or {}
 
     for _, h in ipairs(rows) do
         h.id = tonumber(h.id) or 0
@@ -998,10 +1003,13 @@ lib.callback.register('LCV:ADMIN:Houses:GetAll', function(source)
         else
             h.status = "vermietet"
         end
+
+        h.interaction_radius = tonumber(h.interaction_radius) or 0.5
     end
 
     return { ok = true, houses = rows }
 end)
+
 
 lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
     if not hasAdminPermission(source, 10) then
@@ -1014,6 +1022,8 @@ lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
 
     local name = tostring(data.name)
     local ownerid = tonumber(data.ownerid) or 0
+    local radius = tonumber(data.radius) or 0.5
+
 
     local id = MySQL.insert.await([[
         INSERT INTO houses
@@ -1051,29 +1061,35 @@ lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
     -- ENTRY Interaction
     MySQL.insert.await([[
         INSERT INTO interaction_points
-            (name, description, type, x, y, z, radius, enabled, data)
-        VALUES ('HOUSE', ?, 'house', ?, ?, ?, 1.0, 1, ?)
+    (name, description, type, x, y, z, radius, enabled, data)
+VALUES ('HOUSE', ?, 'house', ?, ?, ?, ?, 1, ?)
+
     ]], {
-        name,
-        tonumber(data.entry_x) or 0.0,
-        tonumber(data.entry_y) or 0.0,
-        tonumber(data.entry_z) or 0.0,
-        dataJson
-    })
+    name,
+    tonumber(data.entry_x) or 0.0,
+    tonumber(data.entry_y) or 0.0,
+    tonumber(data.entry_z) or 0.0,
+    radius,
+    dataJson
+}
+)
 
     -- GARAGE Interaction (wenn Trigger vorhanden)
     if data.garage_trigger_x and data.garage_trigger_y and data.garage_trigger_z then
         MySQL.insert.await([[
             INSERT INTO interaction_points
-                (name, description, type, x, y, z, radius, enabled, data)
-            VALUES ('HOUSE_GARAGE', ?, 'garage', ?, ?, ?, 1.0, 1, ?)
+    (name, description, type, x, y, z, radius, enabled, data)
+VALUES ('HOUSE_GARAGE', ?, 'garage', ?, ?, ?, ?, 1, ?)
+
         ]], {
-            name,
-            tonumber(data.garage_trigger_x),
-            tonumber(data.garage_trigger_y),
-            tonumber(data.garage_trigger_z),
-            dataJson
-        })
+    name,
+    tonumber(data.garage_trigger_x),
+    tonumber(data.garage_trigger_y),
+    tonumber(data.garage_trigger_z),
+    radius,
+    dataJson
+}
+)
     end
 
     -- EXIT Interaction (über house_ipl.exit_x/y/z)
@@ -1082,20 +1098,23 @@ lib.callback.register('LCV:ADMIN:Houses:Add', function(source, data)
         if ipl and ipl.exit_x and ipl.exit_y and ipl.exit_z then
             MySQL.insert.await([[
                 INSERT INTO interaction_points
-                    (name, description, type, x, y, z, radius, enabled, data)
-                VALUES ('EXIT_HOUSE', ?, 'house', ?, ?, ?, 1.0, 1, ?)
+    (name, description, type, x, y, z, radius, enabled, data)
+VALUES ('EXIT_HOUSE', ?, 'house', ?, ?, ?, ?, 1, ?)
+
             ]], {
-                name,
-                tonumber(ipl.exit_x),
-                tonumber(ipl.exit_y),
-                tonumber(ipl.exit_z),
-                dataJson
-            })
+    name,
+    tonumber(ipl.exit_x),
+    tonumber(ipl.exit_y),
+    tonumber(ipl.exit_z),
+    radius,
+    dataJson
+}
+)
         end
     end
 
     TriggerEvent('lcv:interaction:server:reloadPoints')
-
+    TriggerEvent('LCV:house:forceSync')
     return { ok = true, id = houseId }
 end)
 
@@ -1105,6 +1124,7 @@ lib.callback.register('LCV:ADMIN:Houses:Update', function(source, data)
     end
 
     local id = tonumber(data and data.id)
+    
     if not id then
         return { ok = false, error = 'Ungültige ID' }
     end
@@ -1143,53 +1163,61 @@ lib.callback.register('LCV:ADMIN:Houses:Update', function(source, data)
     })
 
     local dataJson = hmJsonEncode({ houseid = id })
+    local radius = tonumber(data.radius) or 0.5
+
 
     -- ENTRY Update
     MySQL.update.await([[
-        UPDATE interaction_points
-        SET description = ?, x = ?, y = ?, z = ?
-        WHERE name = 'HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
-    ]], {
-        name,
-        tonumber(data.entry_x) or 0.0,
-        tonumber(data.entry_y) or 0.0,
-        tonumber(data.entry_z) or 0.0,
-        id
-    })
+    UPDATE interaction_points
+    SET description = ?, x = ?, y = ?, z = ?, radius = ?
+    WHERE name = 'HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
+]], {
+    name,
+    tonumber(data.entry_x) or 0.0,
+    tonumber(data.entry_y) or 0.0,
+    tonumber(data.entry_z) or 0.0,
+    radius,
+    id
+})
+
 
     -- GARAGE Update
     MySQL.update.await([[
-        UPDATE interaction_points
-        SET description = ?, x = ?, y = ?, z = ?
-        WHERE name = 'HOUSE_GARAGE' AND JSON_EXTRACT(data, '$.houseid') = ?
-    ]], {
-        name,
-        tonumber(data.garage_trigger_x) or 0.0,
-        tonumber(data.garage_trigger_y) or 0.0,
-        tonumber(data.garage_trigger_z) or 0.0,
-        id
-    })
+    UPDATE interaction_points
+    SET description = ?, x = ?, y = ?, z = ?, radius = ?
+    WHERE name = 'HOUSE_GARAGE' AND JSON_EXTRACT(data, '$.houseid') = ?
+]], {
+    name,
+    tonumber(data.garage_trigger_x) or 0.0,
+    tonumber(data.garage_trigger_y) or 0.0,
+    tonumber(data.garage_trigger_z) or 0.0,
+    radius,
+    id
+})
+
 
     -- EXIT Update (frisches ipl lesen)
     if data.ipl then
-        local ipl = MySQL.single.await('SELECT exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { tonumber(data.ipl) })
-        if ipl and ipl.exit_x and ipl.exit_y and ipl.exit_z then
-            MySQL.update.await([[
-                UPDATE interaction_points
-                SET description = ?, x = ?, y = ?, z = ?
-                WHERE name = 'EXIT_HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
-            ]], {
-                name,
-                tonumber(ipl.exit_x),
-                tonumber(ipl.exit_y),
-                tonumber(ipl.exit_z),
-                id
-            })
-        end
+    local ipl = MySQL.single.await('SELECT exit_x, exit_y, exit_z FROM house_ipl WHERE id = ?', { tonumber(data.ipl) })
+    if ipl and ipl.exit_x and ipl.exit_y and ipl.exit_z then
+        MySQL.update.await([[
+            UPDATE interaction_points
+            SET description = ?, x = ?, y = ?, z = ?, radius = ?
+            WHERE name = 'EXIT_HOUSE' AND JSON_EXTRACT(data, '$.houseid') = ?
+        ]], {
+            name,
+            tonumber(ipl.exit_x) or 0.0,
+            tonumber(ipl.exit_y) or 0.0,
+            tonumber(ipl.exit_z) or 0.0,
+            radius,
+            id
+        })
     end
+end
+
 
     TriggerEvent('lcv:interaction:server:reloadPoints')
-
+    TriggerEvent('LCV:house:forceSync')
     return { ok = true }
 end)
 
@@ -1218,7 +1246,7 @@ lib.callback.register('LCV:ADMIN:Houses:Delete', function(source, data)
     end
 
     TriggerEvent('lcv:interaction:server:reloadPoints')
-
+    TriggerEvent('LCV:house:forceSync')
     return { ok = true }
 end)
 

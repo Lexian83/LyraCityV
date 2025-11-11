@@ -27,7 +27,9 @@ Vue.component("tab-houses", {
         garage_x: null,
         garage_y: null,
         garage_z: null,
+        radius: 0.5,
       },
+
       addError: null,
 
       editDialog: {
@@ -161,6 +163,7 @@ Vue.component("tab-houses", {
         garage_x: null,
         garage_y: null,
         garage_z: null,
+        radius: 0.5,
       };
 
       // 1/3 View + Steuerung freigeben
@@ -230,6 +233,7 @@ Vue.component("tab-houses", {
         garage_x: this.addForm.garage_x,
         garage_y: this.addForm.garage_y,
         garage_z: this.addForm.garage_z,
+        radius: Number(this.addForm.radius) || 0.5,
       };
 
       const res = await this.nuiCall("LCV:ADMIN:Houses:Add", payload);
@@ -265,7 +269,9 @@ Vue.component("tab-houses", {
         garage_x: row.garage_x,
         garage_y: row.garage_y,
         garage_z: row.garage_z,
+        radius: row.interaction_radius || 0.5,
       };
+
       // Edit = weiterhin Fullscreen (Placement Mode nur bei Add)
     },
 
@@ -318,6 +324,7 @@ Vue.component("tab-houses", {
         garage_x: f.garage_x,
         garage_y: f.garage_y,
         garage_z: f.garage_z,
+        radius: Number(f.radius) || 0.5,
       };
 
       this.editDialog.busy = true;
@@ -496,6 +503,11 @@ Vue.component("tab-houses", {
             <label>Miete</label>
             <input v-model.number="addForm.rent" type="number" />
           </div>
+          <div class="field">
+  <label>Interaction Radius</label>
+  <input v-model.number="addForm.radius" type="number" step="0.1" min="0.1" />
+</div>
+
         </div>
 
         <div class="add-grid">
@@ -580,6 +592,11 @@ Vue.component("tab-houses", {
               <label>Miete</label>
               <input v-model.number="editDialog.form.rent" type="number" />
             </div>
+            <div class="field">
+  <label>Interaction Radius</label>
+  <input v-model.number="editDialog.form.radius" type="number" step="0.1" min="0.1" />
+</div>
+
           </div>
 
           <div class="field">

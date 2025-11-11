@@ -361,6 +361,13 @@ RegisterNetEvent('LCV:house:requestSync', function()
     sendAllHouses(src)
 end)
 
+-- Ermöglicht anderen Ressourcen (z.B. Adminsystem),
+-- einen Refresh aller Clients auszulösen.
+RegisterNetEvent('LCV:house:forceSync', function()
+    sendAllHouses()
+end)
+
+
 -- =========================
 -- Enter / Leave House
 -- =========================
