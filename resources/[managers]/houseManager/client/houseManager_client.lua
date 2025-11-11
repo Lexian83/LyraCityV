@@ -42,13 +42,16 @@ RegisterNetEvent('LCV:house:sync', function(list)
         local gz = tonumber(h.garage_trigger_z)
 
         if id and gx and gy and gz then
-            houseGarageTriggers[#houseGarageTriggers + 1] = {
-                id = id,
-                x = gx,
-                y = gy,
-                z = gz
-            }
-        end
+    local rad = tonumber(h.radius) or 1.5  -- Fallback falls NULL
+    houseGarageTriggers[#houseGarageTriggers + 1] = {
+        id = id,
+        x = gx,
+        y = gy,
+        z = gz,
+        radius = rad
+    }
+end
+
     end
 
     print(("[HouseManager][CLIENT] Garage Trigger geladen: %d"):format(#houseGarageTriggers))
@@ -76,14 +79,15 @@ CreateThread(function()
                     sleep = 0
 
                     DrawMarker(
-                        1,                      -- MarkerType
-                        g.x, g.y, g.z - 0.95,  -- Position
-                        0.0, 0.0, 0.0,
-                        0.0, 0.0, 0.0,
-                        2.0, 2.0, 0.2,         -- Größe
-                        255, 255, 0, 150,      -- Gelb
-                        false, true, 2, false, nil, nil, false
-                    )
+    1,
+    g.x, g.y, g.z - 0.95,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    g.radius, g.radius, 0.2,  -- Radius aus DB
+    255, 255, 0, 150,
+    false, true, 2, false, nil, nil, false
+)
+
                 end
             end
         end
