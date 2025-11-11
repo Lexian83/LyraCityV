@@ -8,7 +8,7 @@ version '1.0.0'
 description 'LyraCityV - Housing Management'
 
 server_scripts {
-    '@SQL/server/_bootstrap.lua',      -- stellt MySQL bereit
+    '@oxmysql/lib/MySQL.lua',    -- oxmysql Binding
     'server/houseManager.lua',
 }
 
@@ -23,4 +23,4 @@ server_exports {
     'getprice',
 }
 
-dependency 'SQL'
+dependency 'oxmysql'

@@ -80,9 +80,6 @@ local function createOne(entry)
         category   = entry.category,
         visiblefor = tonumber(entry.visiblefor) or 0
     }
-
-    print(("[BLIP] CREATED #%d '%s' scale=%.2f display=%d shortRange=%s"):
-        format(id, name, scale, display, tostring(shortRange)))
 end
 
 

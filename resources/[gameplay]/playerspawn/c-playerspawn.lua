@@ -263,9 +263,6 @@ local function spawnPlayer(data)
     local heading = data.heading or 0.0
     local dim     = data.dimension or 0
 
-    log(("Spawn %s: isMale=%s | gender=%s | sex=%s")
-        :format(tostring(data.name or "?"), tostring(isMale), tostring(gender), tostring(sex)))
-
     local modelHash = loadModel(modelName)
     if not modelHash then
         log("Konnte gewünschtes Modell nicht laden, versuche mp_m_freemode_01")
@@ -326,8 +323,6 @@ local function spawnPlayer(data)
 
     DoScreenFadeIn(500)
 
-    log(("Spawn fertig: %s @ (%.2f, %.2f, %.2f)")
-        :format(tostring(data.name or "?"), pos.x or 0.0, pos.y or 0.0, pos.z or 0.0))
 end
 
 -- ======= Event Binding =======

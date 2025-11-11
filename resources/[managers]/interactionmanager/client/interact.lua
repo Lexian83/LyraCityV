@@ -35,8 +35,6 @@ RegisterNetEvent('lcv:interaction:client:setPoints', function(list)
       }
     end
   end
-
-  print(("[INTERACT] Loaded %d STATIC_POINTS on client"):format(#STATIC_POINTS))
 end)
 
 
