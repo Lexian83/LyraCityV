@@ -417,36 +417,38 @@ local function HM_Admin_HousesIPL_Add(data)
   if not data or not data.ipl_name or not data.posx or not data.posy or not data.posz then
     return { ok=false, error='Name + pos erforderlich' }
   end
-  local id = MySQL.insert.await([[
-    INSERT INTO house_ipl (ipl_name, ipl, posx, posy, posz, exit_x, exit_y, exit_z)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  ]], {
-    tostring(data.ipl_name),
-    ((data.ipl ~= nil and tostring(data.ipl) ~= '' ) and tostring(data.ipl) or nil),
-    toN(data.posx,0.0), toN(data.posy,0.0), toN(data.posz,0.0),
-    toN(data.exit_x), toN(data.exit_y), toN(data.exit_z)
-  })
-  if not id or id <= 0 then return { ok=false, error='Insert fehlgeschlagen' } end
+
+  -- Leere ipl-Strings als NULL speichern (sauberer)
+  local iplValue = (data.ipl and tostring(data.ipl) or '')
+  if iplValue == '' then iplValue = nil end
+
+  local okIns, insertIdOrErr = pcall(function()
+    return MySQL.insert.await([[
+      INSERT INTO house_ipl (ipl_name, ipl, posx, posy, posz, exit_x, exit_y, exit_z)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ]], {
+      tostring(data.ipl_name),
+      iplValue,
+      toN(data.posx,0.0), toN(data.posy,0.0), toN(data.posz,0.0),
+      toN(data.exit_x), toN(data.exit_y), toN(data.exit_z)
+    })
+  end)
+
+  if not okIns then
+    local msg = tostring(insertIdOrErr or '')
+    if msg:find('Duplicate entry') and msg:find('uniq_ipl_name') then
+      return { ok=false, error='duplicate_ipl_name' }
+    end
+    return { ok=false, error='db_insert_failed' }
+  end
+
+  local id = tonumber(insertIdOrErr or 0) or 0
+  if id <= 0 then
+    return { ok=false, error='Insert fehlgeschlagen' }
+  end
   return { ok=true, id=id }
 end
 
-local function HM_Admin_HousesIPL_Update(data)
-  local id = toN(data and data.id)
-  if not id then return { ok=false, error='Ungültige ID' } end
-  local affected = MySQL.update.await([[
-    UPDATE house_ipl
-    SET ipl_name = ?, ipl = ?, posx = ?, posy = ?, posz = ?, exit_x = ?, exit_y = ?, exit_z = ?
-    WHERE id = ?
-  ]], {
-    tostring(data.ipl_name or ''),
-    ((data.ipl ~= nil and tostring(data.ipl) ~= '' ) and tostring(data.ipl) or nil),
-    toN(data.posx,0.0), toN(data.posy,0.0), toN(data.posz,0.0),
-    toN(data.exit_x), toN(data.exit_y), toN(data.exit_z),
-    id
-  })
-  if not affected or affected < 1 then return { ok=false, error='Update fehlgeschlagen' } end
-  return { ok=true }
-end
 
 local function HM_Admin_HousesIPL_Delete(data)
   local id = toN(data and data.id)

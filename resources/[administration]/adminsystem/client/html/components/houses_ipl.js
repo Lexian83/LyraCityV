@@ -32,6 +32,7 @@ Vue.component("tab-houses_ipl", {
         busy: false,
         error: null,
       },
+      addBusy: false,
     };
   },
 
@@ -93,41 +94,65 @@ Vue.component("tab-houses_ipl", {
 
     // ADD
     async submitAdd() {
+      if (this.addBusy) return; // ⬅️ Doppel-Submit verhindern
+      this.addBusy = true;
       this.addError = null;
+
       if (!this.addForm.ipl_name.trim()) {
         this.addError = "IPL Name ist erforderlich.";
+        this.addBusy = false;
         return;
       }
-      const payload = {
-        ipl_name: this.addForm.ipl_name.trim(),
-        ipl: this.addForm.ipl ? this.addForm.ipl.trim() : "",
-        posx: this.addForm.posx,
-        posy: this.addForm.posy,
-        posz: this.addForm.posz,
-        exit_x: this.addForm.exit_x,
-        exit_y: this.addForm.exit_y,
-        exit_z: this.addForm.exit_z,
-      };
 
-      const res = await this.nuiCall("LCV:ADMIN:HousesIPL:Add", payload);
-      if (!res.ok) {
-        this.addError =
-          "Fehler beim Anlegen: " + (res.error || "Unbekannter Fehler");
+      // Optional: Clientseitiger Duplicate-Check
+      const exists = this.ipls.some(
+        (r) =>
+          String(r.ipl_name || "").toLowerCase() ===
+          this.addForm.ipl_name.trim().toLowerCase()
+      );
+      if (exists) {
+        this.addError = "IPL-Name existiert bereits.";
+        this.addBusy = false;
         return;
       }
-      this.addForm = {
-        ipl_name: "",
-        ipl: "",
-        posx: null,
-        posy: null,
-        posz: null,
-        exit_x: null,
-        exit_y: null,
-        exit_z: null,
-      };
-      await this.reloadAll();
+
+      try {
+        const payload = {
+          ipl_name: this.addForm.ipl_name.trim(),
+          ipl: this.addForm.ipl ? this.addForm.ipl.trim() : "",
+          posx: this.addForm.posx,
+          posy: this.addForm.posy,
+          posz: this.addForm.posz,
+          exit_x: this.addForm.exit_x,
+          exit_y: this.addForm.exit_y,
+          exit_z: this.addForm.exit_z,
+        };
+
+        const res = await this.nuiCall("LCV:ADMIN:HousesIPL:Add", payload);
+        if (!res || !res.ok) {
+          this.addError = (res && res.error) || "Speichern fehlgeschlagen.";
+          return;
+        }
+
+        // Reset (inkl. ipl) und Liste neu laden
+        this.addForm = {
+          ipl_name: "",
+          ipl: "",
+          posx: null,
+          posy: null,
+          posz: null,
+          exit_x: null,
+          exit_y: null,
+          exit_z: null,
+        };
+        await this.reloadAll();
+      } catch (e) {
+        console.error(e);
+        this.addError = "Unerwarteter Fehler.";
+      } finally {
+        this.addBusy = false;
+      }
     },
-
     // EDIT
     openEdit(row) {
       this.editDialog.visible = true;
@@ -329,8 +354,8 @@ Vue.component("tab-houses_ipl", {
 
         <div class="add-actions">
           <div class="error" v-if="addError">{{ addError }}</div>
-          <button class="add-save-btn" @click="submitAdd">
-            <i class="fa-solid fa-save"></i>Speichern
+          <button class="add-save-btn" @click="submitAdd" :disabled="addBusy">
+            <i class="fa-solid fa-save"></i>Hinzufügen
           </button>
         </div>
       </div>
