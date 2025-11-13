@@ -302,7 +302,7 @@ local function HM_Admin_Houses_Update(data)
     allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
     maxkeys, pincode, id
   })
-  if not affected or affected < 1 then return { ok=false, error='Update fehlgeschlagen.' } end
+  --if not affected or affected < 1 then return { ok=false, error='Update fehlgeschlagen.' } end
 
   local radiusJson = toN(radius, 0.5)
   MySQL.update.await([[
@@ -328,9 +328,15 @@ local function HM_Admin_Houses_Update(data)
     end
   end
 
+-- 0 geänderte Zeilen sind kein Fehler, das kann bei identischen Werten passieren
+local changed = tonumber(affected or 0) or 0
+if changed > 0 then
+  -- Nur bei echten Änderungen Syncs auslösen
   TriggerEvent('lcv:interaction:server:reloadPoints')
   TriggerEvent('LCV:house:forceSync')
-  return { ok=true }
+end
+return { ok = true, changed = changed }
+
 end
 
 
