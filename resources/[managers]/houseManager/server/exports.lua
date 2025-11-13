@@ -91,6 +91,27 @@ local function normalize_house(row)
     row.status = "vermietet"
   end
   ensure_spawns(row)  -- 👈 NEU
+  local spawns = jdec(row.garage_spawns, nil)
+
+-- Migration: falls noch alte garage_x/y/z existieren, daraus 1. Spawn erzeugen
+if (not spawns or #spawns == 0) and row.garage_x and row.garage_y and row.garage_z then
+  spawns = {{
+    sid = 1,
+    type = 'both',
+    x = tonumber(row.garage_x) or 0.0,
+    y = tonumber(row.garage_y) or 0.0,
+    z = tonumber(row.garage_z) or 0.0,
+    heading = tonumber(row.heading or 0.0) or 0.0,
+    radius = 3.0
+  }}
+  -- direkt persistieren, damit alle künftigen Reads den JSON-Wert haben
+  if row.id then
+    MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(spawns), tonumber(row.id) })
+  end
+end
+
+row.garage_spawns = spawns or {}
+row.garage_spawns_count = #row.garage_spawns
   return row
 end
 
@@ -401,7 +422,7 @@ local function HM_Admin_HousesIPL_Add(data)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   ]], {
     tostring(data.ipl_name),
-    data.ipl and tostring(data.ipl) or nil,
+    ((data.ipl ~= nil and tostring(data.ipl) ~= '' ) and tostring(data.ipl) or nil),
     toN(data.posx,0.0), toN(data.posy,0.0), toN(data.posz,0.0),
     toN(data.exit_x), toN(data.exit_y), toN(data.exit_z)
   })
@@ -418,7 +439,7 @@ local function HM_Admin_HousesIPL_Update(data)
     WHERE id = ?
   ]], {
     tostring(data.ipl_name or ''),
-    data.ipl and tostring(data.ipl) or nil,
+    ((data.ipl ~= nil and tostring(data.ipl) ~= '' ) and tostring(data.ipl) or nil),
     toN(data.posx,0.0), toN(data.posy,0.0), toN(data.posz,0.0),
     toN(data.exit_x), toN(data.exit_y), toN(data.exit_z),
     id
@@ -497,6 +518,8 @@ local function HM_Admin_Houses_GarageSpawns_Add(houseId, spawn)
 
   spawns[#spawns+1] = spawn
   MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(spawns), houseId })
+  TriggerEvent('LCV:house:forceSync')
+
   return { ok=true, sid=spawn.sid, spawns=spawns }
 end
 
@@ -509,23 +532,26 @@ local function HM_Admin_Houses_GarageSpawns_Update(houseId, spawn)
   local spawns = jdec(row and row.garage_spawns, {})
   local found = false
   for i, s in ipairs(spawns) do
-    if tonumber(s.sid) == sid then
-      -- nur bekannte Keys überschreiben
-      s.type    = spawn.type    or s.type
-      s.x       = (spawn.x ~= nil) and tonumber(spawn.x) or s.x
-      s.y       = (spawn.y ~= nil) and tonumber(spawn.y) or s.y
-      s.z       = (spawn.z ~= nil) and tonumber(spawn.z) or s.z
-      s.heading = (spawn.heading ~= nil) and tonumber(spawn.heading) or s.heading
-      s.radius  = (spawn.radius ~= nil) and tonumber(spawn.radius) or s.radius
-      s.allowed = spawn.allowed or s.allowed
-      s.label   = spawn.label   or s.label
-      found = true
-      break
-    end
+  if tonumber(s.sid) == sid then
+    s.type    = spawn.type    or s.type
+    s.x       = (spawn.x ~= nil) and tonumber(spawn.x) or s.x
+    s.y       = (spawn.y ~= nil) and tonumber(spawn.y) or s.y
+    s.z       = (spawn.z ~= nil) and tonumber(spawn.z) or s.z
+    s.heading = (spawn.heading ~= nil) and tonumber(spawn.heading) or s.heading
+    s.radius  = (spawn.radius ~= nil) and tonumber(spawn.radius) or s.radius
+    s.allowed = spawn.allowed or s.allowed
+    s.label   = spawn.label   or s.label
+    found = true
+    break
   end
-  if not found then return { ok=false, error='sid not found' } end
-  MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(spawns), houseId })
-  return { ok=true, spawns=spawns }
+end
+if not found then return { ok=false, error='sid not found' } end
+
+MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(spawns), houseId })
+TriggerEvent('LCV:house:forceSync')   -- ✅ nach erfolgreichem Update
+
+return { ok=true, spawns=spawns }
+
 end
 
 local function HM_Admin_Houses_GarageSpawns_Delete(houseId, sid)
@@ -544,6 +570,8 @@ local function HM_Admin_Houses_GarageSpawns_Delete(houseId, sid)
   end
   if not removed then return { ok=false, error='sid not found' } end
   MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(out), houseId })
+  TriggerEvent('LCV:house:forceSync')
+
   return { ok=true, spawns=out }
 end
 

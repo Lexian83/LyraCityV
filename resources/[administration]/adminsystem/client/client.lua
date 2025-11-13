@@ -1170,3 +1170,48 @@ RegisterNUICallback('LCV:ADMIN:Houses:GetStreetName', function(data, cb)
     local crossName  = GetStreetNameFromHashKey(cHash)
     cb({ ok = true, street = streetName or '', cross = crossName or '' })
 end)
+-- ===== IPL LOAD / UNLOAD (Clientseitig) =====
+local _loadedIpls = {}
+
+RegisterNUICallback('LCV:ADMIN:IPL:Load', function(data, cb)
+    local name = data and data.name
+    if not name or name == '' then
+        cb({ ok = false, error = 'missing_name' })
+        return
+    end
+
+    -- schon geladen? egal, RequestIpl ist idempotent – wir tracken nur fürs UI
+    RequestIpl(name)
+    _loadedIpls[name] = true
+
+    lib.notify({
+        title = 'IPL geladen',
+        description = ('%s wurde angefordert.'):format(name),
+        type = 'success',
+        position = 'center-right',
+        duration = 2500
+    })
+
+    cb({ ok = true, loaded = true, name = name })
+end)
+
+RegisterNUICallback('LCV:ADMIN:IPL:Unload', function(data, cb)
+    local name = data and data.name
+    if not name or name == '' then
+        cb({ ok = false, error = 'missing_name' })
+        return
+    end
+
+    RemoveIpl(name)
+    _loadedIpls[name] = nil
+
+    lib.notify({
+        title = 'IPL entladen',
+        description = ('%s wurde entfernt.'):format(name),
+        type = 'inform',
+        position = 'center-right',
+        duration = 2500
+    })
+
+    cb({ ok = true, loaded = false, name = name })
+end)

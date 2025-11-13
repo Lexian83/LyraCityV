@@ -78,16 +78,20 @@ end
 
 local function getAllHouses()
     local rows = MySQL.query.await([[
-        SELECT h.id,
-               h.garage_trigger_x, h.garage_trigger_y, h.garage_trigger_z,
-               ig.radius
+        SELECT 
+            h.id,
+            h.garage_trigger_x, h.garage_trigger_y, h.garage_trigger_z,
+            h.garage_spawns,
+            i.radius
         FROM houses h
-        LEFT JOIN interaction_points ig
-          ON ig.name = 'HOUSE_GARAGE'
-         AND JSON_EXTRACT(ig.data, '$.houseid') = h.id
+        LEFT JOIN interaction_points i
+          ON i.name = 'HOUSE'
+         AND JSON_EXTRACT(i.data, '$.houseid') = h.id
+        ORDER BY h.id ASC
     ]]) or {}
     return rows
 end
+
 
 local function sendAllHouses(target)
     local houses = getAllHouses()

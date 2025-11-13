@@ -30,6 +30,11 @@ Vue.component("tab-home", {
         z: "",
       },
       teleportBusy: false,
+      // IPL Tools
+      iplLoadName: "",
+      iplUnloadName: "",
+      iplBusyLoad: false,
+      iplBusyUnload: false,
     };
   },
 
@@ -73,6 +78,75 @@ Vue.component("tab-home", {
         this.error = `Teleport fehlgeschlagen: ${e.message || e}`;
       } finally {
         this.teleportBusy = false;
+      }
+    },
+    getResName() {
+      return typeof GetParentResourceName === "function"
+        ? GetParentResourceName()
+        : "adminsystem";
+    },
+
+    async loadIpl() {
+      if (this.iplBusyLoad) return;
+      const name = String(this.iplLoadName || "").trim();
+      if (!name) {
+        this.error = "Bitte einen IPL-Namen eingeben.";
+        return;
+      }
+
+      this.iplBusyLoad = true;
+      this.error = null;
+      try {
+        const res = await fetch(
+          `https://${this.getResName()}/LCV:ADMIN:IPL:Load`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=UTF-8" },
+            body: JSON.stringify({ name }),
+          }
+        );
+        const json = await res.json().catch(() => null);
+        if (!json || json.ok === false) {
+          throw new Error((json && json.error) || "IPL laden fehlgeschlagen");
+        }
+      } catch (e) {
+        console.error("[ADMIN][HOME] loadIpl error:", e);
+        this.error = e.message || String(e);
+      } finally {
+        this.iplBusyLoad = false;
+      }
+    },
+
+    async unloadIpl() {
+      if (this.iplBusyUnload) return;
+      const name = String(this.iplUnloadName || "").trim();
+      if (!name) {
+        this.error = "Bitte einen IPL-Namen zum Entladen eingeben.";
+        return;
+      }
+
+      this.iplBusyUnload = true;
+      this.error = null;
+      try {
+        const res = await fetch(
+          `https://${this.getResName()}/LCV:ADMIN:IPL:Unload`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=UTF-8" },
+            body: JSON.stringify({ name }),
+          }
+        );
+        const json = await res.json().catch(() => null);
+        if (!json || json.ok === false) {
+          throw new Error(
+            (json && json.error) || "IPL entladen fehlgeschlagen"
+          );
+        }
+      } catch (e) {
+        console.error("[ADMIN][HOME] unloadIpl error:", e);
+        this.error = e.message || String(e);
+      } finally {
+        this.iplBusyUnload = false;
       }
     },
 
@@ -421,6 +495,49 @@ Vue.component("tab-home", {
               style="width:100%;"
             >
               {{ teleportBusy ? "Teleportiere..." : "Teleport ausführen" }}
+            </button>
+          </div>
+          <!-- IPL LADEN -->
+          <div class="teleport-box" style="margin-top:10px; padding:8px; border-radius:8px; background:rgba(0,0,0,0.25);">
+            <div style="font-weight:600; margin-bottom:4px;">
+              IPL laden
+            </div>
+            <input
+              v-model="iplLoadName"
+              type="text"
+              placeholder="z.B. hei_sm_16_apt_01"
+              class="input"
+              style="width:100%; margin-bottom:6px;"
+            />
+            <button
+              class="home-button"
+              :disabled="iplBusyLoad"
+              @click="loadIpl"
+              style="width:100%;"
+            >
+              {{ iplBusyLoad ? "Lade..." : "IPL laden" }}
+            </button>
+          </div>
+
+          <!-- IPL ENTLADEN -->
+          <div class="teleport-box" style="margin-top:6px; padding:8px; border-radius:8px; background:rgba(0,0,0,0.25);">
+            <div style="font-weight:600; margin-bottom:4px;">
+              IPL entladen
+            </div>
+            <input
+              v-model="iplUnloadName"
+              type="text"
+              placeholder="z.B. hei_sm_16_apt_01"
+              class="input"
+              style="width:100%; margin-bottom:6px;"
+            />
+            <button
+              class="home-button danger"
+              :disabled="iplBusyUnload"
+              @click="unloadIpl"
+              style="width:100%;"
+            >
+              {{ iplBusyUnload ? "Entlade..." : "IPL entladen" }}
             </button>
           </div>
 

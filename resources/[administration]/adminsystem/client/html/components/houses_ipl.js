@@ -117,6 +117,7 @@ Vue.component("tab-houses_ipl", {
       }
       this.addForm = {
         ipl_name: "",
+        ipl: "",
         posx: null,
         posy: null,
         posz: null,
@@ -297,7 +298,7 @@ Vue.component("tab-houses_ipl", {
           </div>
           <div class="field">
   <label>IPL (interner Name)</label>
-  <input v-model="editDialog.form.ipl" type="text" />
+  <input v-model="addForm.ipl" type="text" />
 </div>
 
         </div>
