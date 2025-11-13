@@ -1,6 +1,6 @@
 -- resources/auth/server/auth.lua
 -- ==========================================
--- LyraCityV - Auth Gateway
+-- LyraCityV - Auth Gateway (manager-only, no SQL)
 --  - prüft Discord / Rollen
 --  - stellt sicher, dass ein Account existiert
 --  - bindet Account an Session im playerManager
@@ -10,6 +10,19 @@
 local U = LCV.Util
 local log = (LCV.Util and LCV.Util.log) or function(level, msg)
     print(('[AUTH][%s] %s'):format(level, tostring(msg)))
+end
+
+-- ===== Manager-Locator (robust für Ordnernamen) =====
+local function PM()
+    if GetResourceState('playerManager') == 'started' then return exports['playerManager'] end
+    if GetResourceState('lcv-playermanager') == 'started' then return exports['lcv-playermanager'] end
+    return nil
+end
+
+local function AM()
+    if GetResourceState('accountManager') == 'started' then return exports['accountManager'] end
+    if GetResourceState('lcv-accountmanager') == 'started' then return exports['lcv-accountmanager'] end
+    return nil
 end
 
 -- ===== Helpers =====
@@ -22,31 +35,48 @@ local function getRequiredConvars()
 end
 
 local function ensureAccount(discord, steam, hwid, now, cb)
+    local accm = AM()
+    if not accm or not accm.EnsureAccountByDiscord then
+        log("ERROR", "accountManager nicht verfügbar (EnsureAccountByDiscord).")
+        if cb then cb(nil) end
+        return
+    end
     local ok, err = pcall(function()
-        exports['accountManager']:EnsureAccountByDiscord(discord, steam, hwid, now, cb)
+        accm:EnsureAccountByDiscord(discord, steam, hwid, now, cb)
     end)
     if not ok then
-        log("ERROR", "EnsureAccountByDiscord Export fehlgeschlagen: " .. tostring(err))
+        log("ERROR", "EnsureAccountByDiscord Export-Fehler: " .. tostring(err))
         if cb then cb(nil) end
     end
 end
 
 local function getAccountByDiscord(discord, cb)
+    local accm = AM()
+    if not accm or not accm.GetAccountByDiscord then
+        log("ERROR", "accountManager nicht verfügbar (GetAccountByDiscord).")
+        if cb then cb(nil) end
+        return
+    end
     local ok, err = pcall(function()
-        exports['accountManager']:GetAccountByDiscord(discord, cb)
+        accm:GetAccountByDiscord(discord, cb)
     end)
     if not ok then
-        log("ERROR", "GetAccountByDiscord Export fehlgeschlagen: " .. tostring(err))
+        log("ERROR", "GetAccountByDiscord Export-Fehler: " .. tostring(err))
         if cb then cb(nil) end
     end
 end
 
 local function bindAccountToSession(src, accountId)
+    local pm = PM()
+    if not pm or not pm.BindAccount then
+        log("ERROR", "playerManager nicht verfügbar (BindAccount).")
+        return
+    end
     local ok, err = pcall(function()
-        exports['playerManager']:BindAccount(src, accountId)
+        pm:BindAccount(src, accountId)
     end)
     if not ok then
-        log("ERROR", "BindAccount Export fehlgeschlagen: " .. tostring(err))
+        log("ERROR", "BindAccount Export-Fehler: " .. tostring(err))
     end
 end
 
@@ -57,11 +87,11 @@ AddEventHandler('playerConnecting', function(name, setKickReason, deferrals)
     deferrals.defer()
     U.step(deferrals, "initialisiere Verbindungsprüfung ...")
 
+    -- Convars prüfen
     local token, guildId, blockedRoleId
     local ok, err = pcall(function()
         token, guildId, blockedRoleId = getRequiredConvars()
     end)
-
     if not ok then
         log("ERROR", ("Config Error: %s"):format(err))
         return U.fail(deferrals, "Serverkonfiguration unvollständig. Bitte später erneut versuchen.")
@@ -131,7 +161,6 @@ AddEventHandler('playerConnecting', function(name, setKickReason, deferrals)
         end
 
         local now = os.date('%Y-%m-%d %H:%M:%S')
-
         ensureAccount(discord, steam, tokenHw, now, function(acc)
             if not acc or not acc.id then
                 return U.fail(deferrals, "Konto konnte nicht erstellt/gefunden werden.")
@@ -154,7 +183,6 @@ AddEventHandler('playerJoining', function()
             log("WARN", ("playerJoining ohne Account? discord=%s"):format(tostring(discord)))
             return
         end
-
         bindAccountToSession(src, acc.id)
     end)
 end)
@@ -163,18 +191,13 @@ end)
 
 RegisterNetEvent('LCV:playerSpawned', function()
     local src = source
-    local ok, accountId = pcall(function()
-        return exports['playerManager']:GetAccountId(src)
-    end)
-
-    if not ok or not accountId then
-        return
-    end
+    local pm = PM()
+    if not pm or not pm.GetAccountId then return end
+    local ok, accountId = pcall(function() return pm:GetAccountId(src) end)
+    if not ok or not accountId then return end
 
     TriggerEvent('LCV:charselect:load', src, accountId)
 end)
-
--- ===== Bridge: alte Charselect-Events → playerManager =====
 
 -- ===== Bridge: alte Charselect-Events → playerManager =====
 
@@ -182,8 +205,6 @@ RegisterNetEvent('LCV:selectCharacterX', function(charId)
     local src = source
     charId = tonumber(charId)
     if not charId then return end
-
-    -- Wir rufen das Server-Event im playerManager mit (src, charId) auf
+    -- Wir rufen das Server-Event im playerManager mit (src, charId) auf:
     TriggerEvent('LCV:Player:SelectCharacter', src, charId)
 end)
-

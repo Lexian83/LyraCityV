@@ -113,39 +113,6 @@ local function sendAllHouses(target)
     end
 end
 
--- =========================
--- Exports
--- =========================
-
-exports('getownerbyhouseid', function(houseId)
-    local row = MySQL.single.await('SELECT ownerid FROM houses WHERE id = ?', { tonumber(houseId) })
-    return row and tonumber(row.ownerid) or nil
-end)
-
-exports('getlockstate', function(houseId)
-    local row = MySQL.single.await('SELECT lock_state FROM houses WHERE id = ?', { tonumber(houseId) })
-    return row and tonumber(row.lock_state) or nil
-end)
-
-exports('getrent', function(houseId)
-    local row = MySQL.single.await('SELECT rent FROM houses WHERE id = ?', { tonumber(houseId) })
-    return row and tonumber(row.rent) or nil
-end)
-
-exports('getprice', function(houseId)
-    local row = MySQL.single.await('SELECT price FROM houses WHERE id = ?', { tonumber(houseId) })
-    return row and tonumber(row.price) or nil
-end)
-
-exports('getpincode', function(houseId)
-    local row = MySQL.single.await('SELECT pincode FROM houses WHERE id = ?', { tonumber(houseId) })
-    return row and row.pincode or nil
-end)
-
-exports('getanzahlapartments', function(houseId)
-    local row = MySQL.single.await('SELECT apartments FROM houses WHERE id = ?', { tonumber(houseId) })
-    return row and tonumber(row.apartments) or 0
-end)
 
 -- =========================
 -- House CRUD

@@ -17,7 +17,15 @@ shared_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/server.lua'
+    'server/server.lua',
+    'server/permission.lua',
+    'server/character.lua',
+    'server/interaction.lua',
+    'server/npc.lua',
+    'server/factions.lua',
+    'server/housing.lua',
+    'server/blips.lua',
+    'server/ipl.lua'
 }
 
 client_scripts {

@@ -8,9 +8,16 @@ version '1.0.0'
 description 'LyraCityV - Account Management Wrapper'
 
 server_scripts {
-    '@SQL/server/_bootstrap.lua',
-    '@SQL/server/accounts.lua',
+    '@oxmysql/lib/MySQL.lua',
     'server/accountManager.lua',
 }
 
-dependency 'SQL'
+server_exports {
+    'EnsureAccountByDiscord',
+    'GetAccountByDiscord',
+    'UpdateLastLogin'
+}
+
+dependencies {
+    'oxmysql'
+}

@@ -132,6 +132,12 @@ RegisterNetEvent('LCV:world:interact', function()
    lib.notify({ description = "Dies ist ein SODA AUTOMAT", type = "info" })
     return
 
+      -- Housing Trigger
+    elseif etype == 'house' then
+      TriggerEvent('LCV:Housing:Client:Show',target)
+      lib.notify({ description = "Dies ist ein HAUSTRIGGER", type = "info" })
+    return
+
   -- NPC
   elseif etype == 'npc' then
     local npcType = target.type or "generic"

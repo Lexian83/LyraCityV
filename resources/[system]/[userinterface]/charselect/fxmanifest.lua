@@ -5,27 +5,27 @@ lua54 'yes'
 ui_page 'ui/index.html'
 
 files {
-    'ui/index.html',
-    'ui/styles.css',
-    'ui/app.js',
-    'ui/assets/*.png',
-    'ui/assets/*.svg',
-    'ui/assets/*.webp'
+  'ui/index.html',
+  'ui/styles.css',
+  'ui/app.js',
+  'ui/assets/*.png',
+  'ui/assets/*.svg',
+  'ui/assets/*.webp'
 }
 
 client_scripts {
-    'client.lua'
+  'client.lua'
 }
 
 shared_scripts {
-    '@ox_lib/init.lua'
+  '@ox_lib/init.lua'
 }
 
 server_scripts {
-    '@SQL/server/_bootstrap.lua',
-    '@SQL/server/characters.lua',
-    'server.lua',
+  'server.lua',          -- ✅ nur noch unser Server
 }
 
-dependency 'playerManager'
-
+dependencies {
+  'playerManager',       -- ✅ wir hängen am Manager
+  'ox_lib'
+}

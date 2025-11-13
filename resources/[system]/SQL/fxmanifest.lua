@@ -9,7 +9,6 @@ description 'Lyra City V – Auth & Character (funktional gekapselt, ohne extern
 
 
 server_scripts {
-  '@log/server/logger.lua',
   'server/_bootstrap.lua',
   'server/accounts.lua',
   'server/characters.lua',
