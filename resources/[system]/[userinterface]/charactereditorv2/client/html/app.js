@@ -202,6 +202,18 @@ const app = new Vue({
       });
       console.log("app.js:FUNCTION:characterDone");
     },
+    characterCancel() {
+      fetch(`https://${GetParentResourceName()}/character:Cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data: this.data,
+          clothes: this.clothes ?? {},
+          identity: this.identity ?? {},
+        }),
+      });
+      console.log("app.js:FUNCTION:characterCancel");
+    },
   },
   mounted() {
     //this.$root.$on("updateCharacter", this.updateCharacter);
