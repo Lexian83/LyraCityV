@@ -6,6 +6,7 @@ Vue.component("tab-houses", {
       error: null,
       houses: [],
       ipls: [],
+      editSpawns: { loading: false, error: null, list: [] },
 
       sortField: "id",
       sortDir: "asc",
@@ -73,6 +74,85 @@ Vue.component("tab-houses", {
   },
 
   methods: {
+    async loadEditSpawns(houseId) {
+      this.editSpawns.loading = true;
+      this.editSpawns.error = null;
+      try {
+        if (!houseId) {
+          // ⬅️ Guard
+          this.editSpawns.list = [];
+          return;
+        }
+        const res = await this.nuiCall("LCV:ADMIN:Houses:GarageSpawns:List", {
+          id: houseId,
+        });
+        if (!res.ok) throw new Error(res.error || "Load failed");
+        this.editSpawns.list = Array.isArray(res.spawns) ? res.spawns : [];
+      } catch (e) {
+        this.editSpawns.error = e.message || String(e);
+        this.editSpawns.list = [];
+      } finally {
+        this.editSpawns.loading = false;
+      }
+    },
+
+    async addSpawnFromPos() {
+      if (!this.editDialog.visible || !this.editDialog.form?.id) {
+        // ⬅️ Guard
+        alert(
+          "Spawns können erst nach dem Anlegen im Bearbeiten-Dialog hinzugefügt werden."
+        );
+        return;
+      }
+      const pos = await this.nuiCall("LCV:ADMIN:Npcs:GetPlayerPos");
+      if (!pos || !pos.ok) return alert("Position nicht verfügbar.");
+
+      const payload = {
+        id: this.editDialog.form.id,
+        spawn: {
+          type: "both",
+          x: pos.x,
+          y: pos.y,
+          z: pos.z,
+          heading: pos.heading || 0.0,
+          radius: 3.0,
+        },
+      };
+      const res = await this.nuiCall(
+        "LCV:ADMIN:Houses:GarageSpawns:Add",
+        payload
+      );
+      if (!res.ok)
+        return alert("Spawn anlegen fehlgeschlagen: " + (res.error || "?"));
+      this.editSpawns.list = res.spawns || this.editSpawns.list;
+    },
+
+    async deleteSpawn(sid) {
+      if (!this.editDialog.visible || !this.editDialog.form?.id) {
+        // ⬅️ Guard
+        return alert("Nur im Bearbeiten-Dialog möglich.");
+      }
+      const res = await this.nuiCall("LCV:ADMIN:Houses:GarageSpawns:Delete", {
+        id: this.editDialog.form.id,
+        sid,
+      });
+      if (!res.ok)
+        return alert("Löschen fehlgeschlagen: " + (res.error || "?"));
+      this.editSpawns.list = res.spawns || [];
+    },
+
+    async deleteSpawn(sid) {
+      const res = await this.nuiCall("LCV:ADMIN:Houses:GarageSpawns:Delete", {
+        id: this.editDialog.form.id,
+        sid,
+      });
+      if (!res.ok) {
+        alert("Löschen fehlgeschlagen: " + (res.error || "?"));
+        return;
+      }
+      this.editSpawns.list = res.spawns || [];
+    },
+
     // ===== Helper =====
     toBool(value) {
       if (typeof value === "boolean") {
@@ -427,6 +507,7 @@ Vue.component("tab-houses", {
       };
 
       this.setPlacementMode(true);
+      this.loadEditSpawns(h.id);
     },
 
     async editSetEntry() {
@@ -810,8 +891,49 @@ Vue.component("tab-houses", {
             </div>
           </div>
         </div>
+<!-- Zeile: Garage Spawns -->
+<div class="form-row cols-1">
+  <div class="field">
+    <label>Garage-Ein-/Ausparkpunkte</label>
 
-        <!-- Zeile 8 -->
+    <div class="add-actions" style="margin: 4px 0;">
+      <div class="status" v-if="editSpawns.loading">Lade Spawns ...</div>
+      <div class="error" v-else-if="editSpawns.error">{{ editSpawns.error }}</div>
+      <div class="btn-row">
+        <button class="modal-btn" type="button" @click="addSpawnFromPos">
+          + Spawn von Spieler-Position
+        </button>
+        <button class="modal-btn" type="button" @click="loadEditSpawns(editDialog.form.id)">
+          Reload Spawns
+        </button>
+      </div>
+    </div>
+
+    <ul class="mini-list" v-if="!editSpawns.loading && editSpawns.list.length">
+      <li class="mini-row" v-for="s in editSpawns.list" :key="s.sid">
+        <div>
+          <div class="mini-title">
+            #{{ s.sid }} — {{ s.label || 'Spawn' }} ({{ s.type || 'both' }})
+          </div>
+          <div class="mini-sub">
+            x: {{ Number(s.x).toFixed(2) }},
+            y: {{ Number(s.y).toFixed(2) }},
+            z: {{ Number(s.z).toFixed(2) }},
+            h: {{ Number(s.heading || 0).toFixed(1) }},
+            r: {{ Number(s.radius || 3).toFixed(1) }}
+          </div>
+        </div>
+        <button class="mini-btn danger" @click="deleteSpawn(s.sid)">Löschen</button>
+      </li>
+    </ul>
+
+    <div class="hint" v-if="!editSpawns.loading && !editSpawns.list.length">
+      Noch keine Spawns angelegt.
+    </div>
+  </div>
+</div>
+
+        <!-- Zeile 9 -->
         <div class="add-actions">
           <div class="error" v-if="addError">{{ addError }}</div>
           <div class="btn-row">

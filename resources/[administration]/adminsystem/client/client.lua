@@ -1088,6 +1088,32 @@ RegisterNUICallback('LCV:ADMIN:Houses:ResetPincode', function(data, cb)
     end, data)
 end)
 
+-- ===== HOUSES: GARAGE_SPAWNS NUI BRIDGES =====
+RegisterNUICallback('LCV:ADMIN:Houses:GarageSpawns:List', function(data, cb)
+    lib.callback('LCV:ADMIN:Houses:GarageSpawns:List', false, function(result)
+        cb(result or { ok=false, error='no_response', spawns = {} })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:GarageSpawns:Add', function(data, cb)
+    lib.callback('LCV:ADMIN:Houses:GarageSpawns:Add', false, function(result)
+        cb(result or { ok=false, error='no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:GarageSpawns:Update', function(data, cb)
+    lib.callback('LCV:ADMIN:Houses:GarageSpawns:Update', false, function(result)
+        cb(result or { ok=false, error='no_response' })
+    end, data)
+end)
+
+RegisterNUICallback('LCV:ADMIN:Houses:GarageSpawns:Delete', function(data, cb)
+    lib.callback('LCV:ADMIN:Houses:GarageSpawns:Delete', false, function(result)
+        cb(result or { ok=false, error='no_response' })
+    end, data)
+end)
+
+
 -- Cleanup
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then
@@ -1096,4 +1122,36 @@ AddEventHandler('onResourceStop', function(res)
             closeADMIN()
         end
     end
+end)
+
+-- ===== HOUSES: Spielerposition (für Add/Edit, Spawns etc.) =====
+RegisterNUICallback('LCV:ADMIN:Houses:GetPlayerPos', function(data, cb)
+    local ped = PlayerPedId()
+    if not ped or ped == 0 then
+        cb({ ok = false, error = 'no_ped' })
+        return
+    end
+    local coords = GetEntityCoords(ped)
+    local heading = GetEntityHeading(ped) or 0.0
+    cb({
+        ok = true,
+        x = coords.x + 0.0,
+        y = coords.y + 0.0,
+        z = coords.z + 0.0,
+        heading = heading + 0.0
+    })
+end)
+
+-- (optional, aber von houses.js häufig genutzt) Straßenname am Spieler
+RegisterNUICallback('LCV:ADMIN:Houses:GetStreetName', function(data, cb)
+    local ped = PlayerPedId()
+    if not ped or ped == 0 then
+        cb({ ok = false, error = 'no_ped' })
+        return
+    end
+    local coords = GetEntityCoords(ped)
+    local streetHash, crossingHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
+    local streetName = GetStreetNameFromHashKey(streetHash)
+    local crossName  = GetStreetNameFromHashKey(crossingHash)
+    cb({ ok = true, street = streetName or '', cross = crossName or '' })
 end)

@@ -111,6 +111,52 @@ lib.callback.register('LCV:ADMIN:HousesIPL:Delete', function(source, data)
   return res
 end)
 
+-- ===== HOUSES: GARAGE_SPAWNS (Proxy zu houseManager) =====
+lib.callback.register('LCV:ADMIN:Houses:GarageSpawns:List', function(source, data)
+  if not hasAdminPermission(source, 10) then
+    return { ok=false, error='Keine Berechtigung', spawns = {} }
+  end
+  local id = tonumber(data and data.id)
+  if not id then return { ok=false, error='invalid_house_id', spawns = {} } end
+  local hm = exports['houseManager']
+  return (hm and hm:Admin_Houses_GarageSpawns_List(id)) or { ok=false, error='HM offline', spawns = {} }
+end)
+
+lib.callback.register('LCV:ADMIN:Houses:GarageSpawns:Add', function(source, data)
+  if not hasAdminPermission(source, 10) then
+    return { ok=false, error='Keine Berechtigung' }
+  end
+  local id = tonumber(data and data.id)
+  if not id then return { ok=false, error='invalid_house_id' } end
+  local spawn = data and data.spawn or {}
+  local hm = exports['houseManager']
+  return (hm and hm:Admin_Houses_GarageSpawns_Add(id, spawn)) or { ok=false, error='HM offline' }
+end)
+
+lib.callback.register('LCV:ADMIN:Houses:GarageSpawns:Update', function(source, data)
+  if not hasAdminPermission(source, 10) then
+    return { ok=false, error='Keine Berechtigung' }
+  end
+  local id  = tonumber(data and data.id)
+  local spn = data and data.spawn or {}
+  if not id or not spn or not spn.sid then
+    return { ok=false, error='invalid_payload' }
+  end
+  local hm = exports['houseManager']
+  return (hm and hm:Admin_Houses_GarageSpawns_Update(id, spn)) or { ok=false, error='HM offline' }
+end)
+
+lib.callback.register('LCV:ADMIN:Houses:GarageSpawns:Delete', function(source, data)
+  if not hasAdminPermission(source, 10) then
+    return { ok=false, error='Keine Berechtigung' }
+  end
+  local id  = tonumber(data and data.id)
+  local sid = tonumber(data and data.sid)
+  if not id or not sid then return { ok=false, error='invalid_id_or_sid' } end
+  local hm = exports['houseManager']
+  return (hm and hm:Admin_Houses_GarageSpawns_Delete(id, sid)) or { ok=false, error='HM offline' }
+end)
+
 -- Teleport bleibt lokal (kein DB)
 RegisterNetEvent('LCV:ADMIN:HousesIPL:Teleport', function(id, x, y, z)
   local src = source
