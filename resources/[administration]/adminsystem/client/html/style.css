@@ -1318,3 +1318,23 @@ body {
   display: flex;
   gap: 6px;
 }
+
+.col-center {
+  text-align: center;
+  width: 42px;
+}
+
+.badge-secured {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #2e7d32; /* grün */
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.badge-not-secured {
+  color: #8a8a8a;
+  font-size: 12px;
+}

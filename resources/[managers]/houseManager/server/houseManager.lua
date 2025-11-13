@@ -142,6 +142,8 @@ RegisterNetEvent('LCV:house:create', function(data)
     local allowed_helicopter  = data.allowed_helicopter and 1 or 0
     local allowed_boat        = data.allowed_boat and 1 or 0
 
+    local secured             = (tonumber(data.secured) == 1) and 1 or 0  -- 👈 NEU
+
     local params = {
         name,
         toNumber(data.ownerid),
@@ -160,6 +162,7 @@ RegisterNetEvent('LCV:house:create', function(data)
         data.rent_start or nil,
         jenc(data.data),
         (tonumber(data.lock_state) == 0) and 0 or 1,
+        secured,
         toNumber(data.ipl),
         toNumber(data.fridgeid),
         toNumber(data.storeid),
@@ -178,24 +181,24 @@ RegisterNetEvent('LCV:house:create', function(data)
         pincode
     }
 
-    local id = MySQL.insert.await([[
-        INSERT INTO houses
-            (name, ownerid,
-             entry_x, entry_y, entry_z,
-             garage_trigger_x, garage_trigger_y, garage_trigger_z,
-             garage_x, garage_y, garage_z,
-             price, buyed_at, rent, rent_start, data, lock_state,
-             ipl, fridgeid, storeid,
-             hotel, apartments, garage_size,
-             allowed_bike, allowed_motorbike, allowed_car,
-             allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
-             maxkeys, keys, pincode)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?,
-                ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?)
-    ]], params)
+local id = MySQL.insert.await([[
+  INSERT INTO houses
+    (name, ownerid,
+     entry_x, entry_y, entry_z,
+     garage_trigger_x, garage_trigger_y, garage_trigger_z,
+     garage_x, garage_y, garage_z,
+     price, buyed_at, rent, rent_start, data, lock_state,
+     secured, ipl, fridgeid, storeid,                 -- 👈 NEU: secured vor ipl
+     hotel, apartments, garage_size,
+     allowed_bike, allowed_motorbike, allowed_car,
+     allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
+     maxkeys, keys, pincode)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?)
+]], params)
 
     if not id or id <= 0 then
         log("ERROR", ("Haus erstellen fehlgeschlagen von src=%s"):format(src))
@@ -288,33 +291,34 @@ RegisterNetEvent('LCV:house:update', function(houseId, patch)
     patch     = patch or {}
     if not houseId then return end
 
-    local allowed = {
-        name = true, ownerid = true,
-        entry_x = true, entry_y = true, entry_z = true,
-        garage_trigger_x = true, garage_trigger_y = true, garage_trigger_z = true,
-        garage_x = true, garage_y = true, garage_z = true,
-        price = true, buyed_at = true,
-        rent = true, rent_start = true,
-        data = true, lock_state = true,
-        ipl = true, fridgeid = true, storeid = true,
-        hotel = true, apartments = true, garage_size = true,
-        allowed_bike = true, allowed_motorbike = true, allowed_car = true,
-        allowed_truck = true, allowed_plane = true, allowed_helicopter = true, allowed_boat = true,
-        maxkeys = true, keys = true, pincode = true
-    }
+  local allowed = {
+  name = true, ownerid = true,
+  entry_x = true, entry_y = true, entry_z = true,
+  garage_trigger_x = true, garage_trigger_y = true, garage_trigger_z = true,
+  garage_x = true, garage_y = true, garage_z = true,
+  price = true, buyed_at = true,
+  rent = true, rent_start = true,
+  data = true, lock_state = true,
+  secured = true,                -- 👈 NEU
+  ipl = true, fridgeid = true, storeid = true,
+  hotel = true, apartments = true, garage_size = true,
+  allowed_bike = true, allowed_motorbike = true, allowed_car = true,
+  allowed_truck = true, allowed_plane = true, allowed_helicopter = true, allowed_boat = true,
+  maxkeys = true, keys = true, pincode = true
+}
 
     local sets, vals = {}, {}
     for k, v in pairs(patch) do
         if allowed[k] then
             if k == 'data' or k == 'keys' then
-                v = jenc(v)
-            elseif k == 'lock_state' then
-                v = (tonumber(v) == 0) and 0 or 1
-            elseif k == 'pincode' then
-                v = (v ~= nil and v ~= '') and tostring(v) or nil
-            elseif k ~= 'buyed_at' and k ~= 'rent_start' and k ~= 'name' then
-                v = toNumber(v)
-            end
+  v = jenc(v)
+elseif k == 'lock_state' then
+  v = (tonumber(v) == 0) and 0 or 1
+elseif k == 'secured' then                                  -- 👈 NEU
+  v = (tonumber(v) == 1) and 1 or 0
+elseif k ~= 'buyed_at' and k ~= 'rent_start' and k ~= 'name' then
+  v = toNumber(v)
+end
             sets[#sets+1] = ("`%s` = ?"):format(k)
             vals[#vals+1] = v
         end

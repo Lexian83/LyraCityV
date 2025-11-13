@@ -32,6 +32,7 @@ Vue.component("tab-houses", {
         radius: 0.5,
 
         hotel: false,
+        secured: false, // 👈 NEU
         apartments: 0,
         garage_size: 0,
 
@@ -326,6 +327,7 @@ Vue.component("tab-houses", {
           radius: Number(this.addForm.radius) || 0.5,
 
           hotel: this.addForm.hotel ? 1 : 0,
+          secured: this.addForm.secured ? 1 : 0, // 👈 NEU
           apartments: Number(this.addForm.apartments) || 0,
           garage_size: Number(this.addForm.garage_size) || 0,
 
@@ -406,6 +408,8 @@ Vue.component("tab-houses", {
 
         // Hotel & Apartments
         hotel: asBool(h.hotel, false),
+        secured:
+          h.secured === 1 || h.secured === true || String(h.secured) === "1", // 👈 NEU
         apartments: h.apartments || 0,
         garage_size: h.garage_size || 0,
 
@@ -488,6 +492,7 @@ Vue.component("tab-houses", {
           radius: Number(f.radius) || 0.5,
 
           hotel: f.hotel ? 1 : 0,
+          secured: f.secured ? 1 : 0, // 👈 NEU
           apartments: Number(f.apartments) || 0,
           garage_size: Number(f.garage_size) || 0,
 
@@ -620,6 +625,7 @@ Vue.component("tab-houses", {
               <th class="sortable" @click="setSort('name')">
                 Name <span class="sort-indicator">{{ sortIndicator('name') }}</span>
               </th>
+              <th class="col-center" title="Gesichert">🔒</th>
               <th class="sortable" @click="setSort('ownerid')">
                 Owner <span class="sort-indicator">{{ sortIndicator('ownerid') }}</span>
               </th>
@@ -637,6 +643,19 @@ Vue.component("tab-houses", {
             <tr v-for="h in sortedHouses()" :key="h.id">
               <td>{{ h.id }}</td>
               <td class="data-cell">{{ h.name }}</td>
+              <td class="col-center">
+  <span
+    v-if="h.secured === 1 || h.secured === true || String(h.secured) === '1'"
+    class="badge-secured"
+    title="Gesichert"
+  >🔒</span>
+  <span
+    v-else
+    class="badge-not-secured"
+    title="Nicht gesichert"
+  >—</span>
+</td>
+
               <td>{{ h.ownerid || '-' }}</td>
               <td>{{ statusOf(h) }}</td>
               <td>{{ h.price || 0 }}</td>
@@ -719,6 +738,13 @@ Vue.component("tab-houses", {
               <div class="knob"></div>
             </div>
           </div>
+            <div class="field">
+    <label>Gesichert</label> <!-- 👈 NEU -->
+    <div class="switch" :class="{ on: !!addForm.secured }"
+         @click="addForm.secured = !addForm.secured">
+      <div class="knob"></div>
+    </div>
+  </div>
           <div class="field">
             <label>Apartments</label>
             <input v-model.number="addForm.apartments" type="number" min="0" />
@@ -847,6 +873,14 @@ Vue.component("tab-houses", {
               <div class="knob"></div>
             </div>
           </div>
+            <div class="field">
+    <label>Gesichert</label> <!-- 👈 NEU -->
+    <div class="switch"
+         :class="{ on: !!editDialog.form.secured }"
+         @click="editDialog.form.secured = !editDialog.form.secured">
+      <div class="knob"></div>
+    </div>
+  </div>
           <div class="field">
             <label>Apartments</label>
             <input v-model.number="editDialog.form.apartments" type="number" min="0" />

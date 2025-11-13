@@ -16,6 +16,33 @@ local function jenc(tbl)
   local ok, res = pcall(json.encode, tbl)
   return ok and res or nil
 end
+-- helper
+local function jdec(s, d)
+  if not s then return d end
+  if type(s) == 'table' then return s end
+  local ok, res = pcall(json.decode, s)
+  return ok and res or d
+end
+
+local function ensure_spawns(row)
+  -- wenn keine Spawns aber Legacy-Feld vorhanden -> 1 Spawn migrieren
+  local spawns = jdec(row.garage_spawns, nil)
+  if (not spawns or #spawns == 0) and row.garage_x and row.garage_y and row.garage_z then
+    spawns = {{
+      sid = 1,
+      type = "both",
+      x = tonumber(row.garage_x) or 0.0,
+      y = tonumber(row.garage_y) or 0.0,
+      z = tonumber(row.garage_z) or 0.0,
+      heading = tonumber(row.heading or 0.0) or 0.0,
+      radius = 3.0
+    }}
+    -- zurück in DB schreiben (Migration)
+    MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(spawns), tonumber(row.id) })
+  end
+  row.garage_spawns = spawns or {}
+  row.garage_spawns_count = #row.garage_spawns
+end
 
 -- ===== Normalisierung für UI/Client =====
 local function normalize_house(row)
@@ -49,7 +76,7 @@ local function normalize_house(row)
 
   row.maxkeys            = toN(row.maxkeys, 0)
   row.interaction_radius = toN(row.interaction_radius, 0.5)
-  row.secured            = toN(row.secured, 0)
+  row.secured            = (row.secured == 1 or row.secured == true or tostring(row.secured) == '1') and 1 or 0
 
   -- Status ableiten
   local hasOwner     = row.ownerid and row.ownerid > 0
@@ -63,7 +90,7 @@ local function normalize_house(row)
   else
     row.status = "vermietet"
   end
-
+  ensure_spawns(row)  -- 👈 NEU
   return row
 end
 
@@ -131,6 +158,7 @@ local function HM_Admin_Houses_Add(data)
   local garage_size  = toN(data.garage_size, 0)
   local maxkeys      = toN(data.maxkeys, 0)
   local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
+  local secured      = (toN(data.secured, 0) == 1) and 1 or 0  -- 👈 NEU
 
   local allowed_bike        = (toN(data.allowed_bike,1) == 1) and 1 or 0
   local allowed_motorbike   = (toN(data.allowed_motorbike,1) == 1) and 1 or 0
@@ -146,12 +174,12 @@ local function HM_Admin_Houses_Add(data)
        entry_x, entry_y, entry_z,
        garage_trigger_x, garage_trigger_y, garage_trigger_z,
        garage_x, garage_y, garage_z,
-       price, rent, ipl, lock_state,
+       price, rent, ipl, lock_state, secured,   -- 👈 secured direkt nach lock_state
        hotel, apartments, garage_size,
        allowed_bike, allowed_motorbike, allowed_car,
        allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
        maxkeys, `keys`, pincode)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?,           -- 👈 secured Wert
             ?, ?, ?,
             ?, ?, ?,
             ?, ?, ?, ?,
@@ -163,6 +191,7 @@ local function HM_Admin_Houses_Add(data)
     toN(data.garage_trigger_x), toN(data.garage_trigger_y), toN(data.garage_trigger_z),
     toN(data.garage_x), toN(data.garage_y), toN(data.garage_z),
     toN(data.price,0), toN(data.rent,0), toN(data.ipl),
+    secured,  -- 👈
     hotel, apartments, garage_size,
     allowed_bike, allowed_motorbike, allowed_car,
     allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
@@ -173,14 +202,14 @@ local function HM_Admin_Houses_Add(data)
 
   local dataJson = jenc({ houseid = id })
 
-  -- ENTRY interaction
+  -- ENTRY
   MySQL.insert.await([[
     INSERT INTO interaction_points
       (name, description, type, x, y, z, radius, enabled, data)
     VALUES ('HOUSE', ?, 'house', ?, ?, ?, ?, 1, ?)
   ]], { name, toN(data.entry_x,0.0), toN(data.entry_y,0.0), toN(data.entry_z,0.0), radius, dataJson })
 
-  -- GARAGE interaction
+  -- GARAGE
   if data.garage_trigger_x and data.garage_trigger_y and data.garage_trigger_z then
     MySQL.insert.await([[
       INSERT INTO interaction_points
@@ -201,12 +230,11 @@ local function HM_Admin_Houses_Add(data)
     end
   end
 
-  -- Trigger Reloads
   TriggerEvent('lcv:interaction:server:reloadPoints')
   TriggerEvent('LCV:house:forceSync')
-
   return { ok=true, id=id }
 end
+
 
 local function HM_Admin_Houses_Update(data)
   local id = toN(data and data.id)
@@ -222,6 +250,7 @@ local function HM_Admin_Houses_Update(data)
   local garage_size  = toN(data.garage_size, 0)
   local maxkeys      = toN(data.maxkeys, 0)
   local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
+  local secured      = (toN(data.secured, 0) == 1) and 1 or 0  -- 👈 NEU
 
   local allowed_bike        = (toN(data.allowed_bike,1) == 1) and 1 or 0
   local allowed_motorbike   = (toN(data.allowed_motorbike,1) == 1) and 1 or 0
@@ -237,7 +266,7 @@ local function HM_Admin_Houses_Update(data)
         entry_x = ?, entry_y = ?, entry_z = ?,
         garage_trigger_x = ?, garage_trigger_y = ?, garage_trigger_z = ?,
         garage_x = ?, garage_y = ?, garage_z = ?,
-        price = ?, rent = ?, ipl = ?,
+        price = ?, rent = ?, ipl = ?, lock_state = 1, secured = ?,   -- 👈 secured mit setzen
         hotel = ?, apartments = ?, garage_size = ?,
         allowed_bike = ?, allowed_motorbike = ?, allowed_car = ?,
         allowed_truck = ?, allowed_plane = ?, allowed_helicopter = ?, allowed_boat = ?,
@@ -250,6 +279,7 @@ local function HM_Admin_Houses_Update(data)
     toN(data.garage_trigger_x), toN(data.garage_trigger_y), toN(data.garage_trigger_z),
     toN(data.garage_x), toN(data.garage_y), toN(data.garage_z),
     toN(data.price,0), toN(data.rent,0), toN(data.ipl),
+    secured,  -- 👈
     hotel, apartments, garage_size,
     allowed_bike, allowed_motorbike, allowed_car,
     allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
@@ -257,7 +287,6 @@ local function HM_Admin_Houses_Update(data)
   })
   if not affected or affected < 1 then return { ok=false, error='Update fehlgeschlagen.' } end
 
-  -- Interactions angleichen
   local radiusJson = toN(radius, 0.5)
   MySQL.update.await([[
     UPDATE interaction_points
@@ -286,6 +315,7 @@ local function HM_Admin_Houses_Update(data)
   TriggerEvent('LCV:house:forceSync')
   return { ok=true }
 end
+
 
 local function HM_Admin_Houses_Delete(data)
   local id = toN(data and data.id)
@@ -405,3 +435,96 @@ local function HM_GetAll()
   return rows
 end
 exports('GetAll', HM_GetAll)
+-- =======================
+--  GARAGE SPAWNS (ADMIN)
+-- =======================
+
+local function HM_Admin_Houses_GarageSpawns_List(houseId)
+  houseId = tonumber(houseId)
+  if not houseId then return { ok=false, error='invalid houseId', spawns={} } end
+  local row = MySQL.single.await('SELECT garage_spawns FROM houses WHERE id = ?', { houseId })
+  local spawns = jdec(row and row.garage_spawns, {})
+  return { ok=true, spawns=spawns }
+end
+
+local function next_sid(spawns)
+  local maxsid = 0
+  for _, s in ipairs(spawns) do
+    local sid = tonumber(s.sid) or 0
+    if sid > maxsid then maxsid = sid end
+  end
+  return maxsid + 1
+end
+
+local function HM_Admin_Houses_GarageSpawns_Add(houseId, spawn)
+  houseId = tonumber(houseId)
+  if not houseId then return { ok=false, error='invalid houseId' } end
+  if type(spawn) ~= 'table' then return { ok=false, error='invalid spawn' } end
+
+  local row = MySQL.single.await('SELECT garage_spawns FROM houses WHERE id = ?', { houseId })
+  local spawns = jdec(row and row.garage_spawns, {})
+
+  spawn.sid     = spawn.sid or next_sid(spawns)
+  spawn.type    = spawn.type or 'both'
+  spawn.x       = tonumber(spawn.x) or 0.0
+  spawn.y       = tonumber(spawn.y) or 0.0
+  spawn.z       = tonumber(spawn.z) or 0.0
+  spawn.heading = tonumber(spawn.heading) or 0.0
+  spawn.radius  = tonumber(spawn.radius or 3.0) or 3.0
+
+  spawns[#spawns+1] = spawn
+  MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(spawns), houseId })
+  return { ok=true, sid=spawn.sid, spawns=spawns }
+end
+
+local function HM_Admin_Houses_GarageSpawns_Update(houseId, spawn)
+  houseId = tonumber(houseId)
+  if not houseId then return { ok=false, error='invalid houseId' } end
+  if type(spawn) ~= 'table' or not spawn.sid then return { ok=false, error='invalid spawn.sid' } end
+  local sid = tonumber(spawn.sid)
+  local row = MySQL.single.await('SELECT garage_spawns FROM houses WHERE id = ?', { houseId })
+  local spawns = jdec(row and row.garage_spawns, {})
+  local found = false
+  for i, s in ipairs(spawns) do
+    if tonumber(s.sid) == sid then
+      -- nur bekannte Keys überschreiben
+      s.type    = spawn.type    or s.type
+      s.x       = (spawn.x ~= nil) and tonumber(spawn.x) or s.x
+      s.y       = (spawn.y ~= nil) and tonumber(spawn.y) or s.y
+      s.z       = (spawn.z ~= nil) and tonumber(spawn.z) or s.z
+      s.heading = (spawn.heading ~= nil) and tonumber(spawn.heading) or s.heading
+      s.radius  = (spawn.radius ~= nil) and tonumber(spawn.radius) or s.radius
+      s.allowed = spawn.allowed or s.allowed
+      s.label   = spawn.label   or s.label
+      found = true
+      break
+    end
+  end
+  if not found then return { ok=false, error='sid not found' } end
+  MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(spawns), houseId })
+  return { ok=true, spawns=spawns }
+end
+
+local function HM_Admin_Houses_GarageSpawns_Delete(houseId, sid)
+  houseId = tonumber(houseId); sid = tonumber(sid)
+  if not houseId or not sid then return { ok=false, error='invalid id/sid' } end
+  local row = MySQL.single.await('SELECT garage_spawns FROM houses WHERE id = ?', { houseId })
+  local spawns = jdec(row and row.garage_spawns, {})
+  local out = {}
+  local removed = false
+  for _, s in ipairs(spawns) do
+    if tonumber(s.sid) ~= sid then
+      out[#out+1] = s
+    else
+      removed = true
+    end
+  end
+  if not removed then return { ok=false, error='sid not found' } end
+  MySQL.update.await('UPDATE houses SET garage_spawns = ? WHERE id = ?', { json.encode(out), houseId })
+  return { ok=true, spawns=out }
+end
+
+exports('Admin_Houses_GarageSpawns_List',   HM_Admin_Houses_GarageSpawns_List)
+exports('Admin_Houses_GarageSpawns_Add',    HM_Admin_Houses_GarageSpawns_Add)
+exports('Admin_Houses_GarageSpawns_Update', HM_Admin_Houses_GarageSpawns_Update)
+exports('Admin_Houses_GarageSpawns_Delete', HM_Admin_Houses_GarageSpawns_Delete)

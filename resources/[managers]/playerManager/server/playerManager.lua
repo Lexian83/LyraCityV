@@ -32,34 +32,45 @@ end
 
 local function sanitizeCharacter(full)
     if not full then return nil end
-    full.gender            = toN(full.gender, 0)
-    full.dimension         = toN(full.dimension, 0)
-    full.health            = toN(full.health, 200)
-    full.thirst            = toN(full.thirst, 100)
-    full.food              = toN(full.food, 100)
-    full.residence_permit  = toN(full.residence_permit, 0)
-    full.past              = toN(full.past, 0)
 
-    full.pos_x             = toN(full.pos_x, 0.0)
-    full.pos_y             = toN(full.pos_y, 0.0)
-    full.pos_z             = toN(full.pos_z, 0.0)
-    full.heading           = toN(full.heading, 0.0)
+    local function b2n(v, d)
+        if type(v) == 'boolean' then return v and 1 or 0 end
+        local n = tonumber(v)
+        return n ~= nil and n or (d or 0)
+    end
+
+    full.gender            = b2n(full.gender, 0)
+    full.dimension         = b2n(full.dimension, 0)
+    full.health            = b2n(full.health, 200)
+    full.thirst            = b2n(full.thirst, 100)
+    full.food              = b2n(full.food, 100)
+
+    -- 👇 Wichtig: TinyInt(1) kommt als boolean rein → korrekt nach Zahl mappen
+    full.residence_permit  = b2n(full.residence_permit, 0)
+    full.past              = b2n(full.past, 0)
+    full.is_locked         = (full.is_locked == 1 or full.is_locked == true) and 1 or 0
+
+    full.pos_x             = b2n(full.pos_x, 0.0)
+    full.pos_y             = b2n(full.pos_y, 0.0)
+    full.pos_z             = b2n(full.pos_z, 0.0)
+    full.heading           = b2n(full.heading, 0.0)
 
     full.appearance        = decodeJsonField(full.appearance, {})
     full.clothes           = decodeJsonField(full.clothes, {})
     return full
 end
 
+
 local function buildSpawnData(full)
     full = sanitizeCharacter(full)
     if not full then return nil end
-
+print(('[DEBUG][playerManager][playerManager.lua - Server - buildSpawnData] Residence Permit: %s | Past: %s'):format(full.residence_permit,full.past))
     local x, y, z, heading
     if (full.residence_permit or 0) >= 1 then
-        x, y, z, heading = full.pos_x, full.pos_y, full.pos_z, full.heading
-    elseif full.residence_permit == 0 and (full.past or 0) == 0 then
+        x, y, z, heading = full.pos_x, full.pos_y, full.pos_z, full.heading --Letze Spieler Position weil eingereist
+    elseif full.residence_permit == 0 and (full.past or 0) == 0 then -- Flughafen weil nicht eingereist und legaler weg
         x, y, z, heading = -1111.24, -2843.37, 14.89, 267.78
-    elseif full.residence_permit == 0 and (full.past or 0) == 1 then
+    elseif full.residence_permit == 0 and (full.past or 0) == 1 then -- Prison weil nicht eingereist und Illegaler weg
         x, y, z, heading = 1690.70, 2606.72, 45.56, 281.05
     else
         x, y, z, heading = 0.0, 0.0, 0.0, 0.0
@@ -97,7 +108,9 @@ local function db_getCharacterFull(charId, accountId)
     return MySQL.single.await([[
         SELECT
             id, account_id, name, gender, level, birthdate, type,
-            is_locked, residence_permit, past,
+            is_locked,
+            CAST(residence_permit AS SIGNED) AS residence_permit,
+            CAST(past AS SIGNED)             AS past,
             dimension, health, thirst, food,
             pos_x, pos_y, pos_z, heading,
             appearance, clothes
@@ -105,6 +118,7 @@ local function db_getCharacterFull(charId, accountId)
         WHERE id=? AND account_id=?
     ]], { charId, accountId })
 end
+
 
 local function db_updateState(charId, accountId, state)
     local pos   = state.pos or {}
