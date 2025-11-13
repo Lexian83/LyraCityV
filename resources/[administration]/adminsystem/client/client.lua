@@ -19,7 +19,7 @@ end)
 
 local function openADMIN(data)
     SendNUIMessage({ action = "openADMIN" })
-
+exports.inputmanager:LCV_OpenUI('ADMINSYSTEM', { nui = true, keepInput = false })
     CreateThread(function()
         Wait(150)
         SetNuiFocus(true, true)
@@ -31,6 +31,7 @@ local function closeADMIN()
     SendNUIMessage({ action = "closeADMIN" })
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
+    exports.inputmanager:LCV_CloseUI('ADMINSYSTEM')
 end
 
 RegisterNetEvent('LCV:ADMIN:Client:Show', function(data)
@@ -1124,7 +1125,19 @@ AddEventHandler('onResourceStop', function(res)
     end
 end)
 
--- ===== HOUSES: Spielerposition (für Add/Edit, Spawns etc.) =====
+
+-- =========================
+-- UI: PlacementMode Toggle
+-- =========================
+RegisterNUICallback('LCV:ADMIN:UI:SetPlacementMode', function(data, cb)
+    -- data.enabled: true/false – du kannst hier später die Kamera/Marker o.ä. umschalten.
+    -- Für jetzt reicht ein sofortiges OK, damit die UI nicht hängt.
+    cb({ ok = true })
+end)
+
+-- =========================
+-- Houses: Spielerposition
+-- =========================
 RegisterNUICallback('LCV:ADMIN:Houses:GetPlayerPos', function(data, cb)
     local ped = PlayerPedId()
     if not ped or ped == 0 then
@@ -1142,7 +1155,9 @@ RegisterNUICallback('LCV:ADMIN:Houses:GetPlayerPos', function(data, cb)
     })
 end)
 
--- (optional, aber von houses.js häufig genutzt) Straßenname am Spieler
+-- =========================
+-- Houses: Straßenname (optional)
+-- =========================
 RegisterNUICallback('LCV:ADMIN:Houses:GetStreetName', function(data, cb)
     local ped = PlayerPedId()
     if not ped or ped == 0 then
@@ -1150,8 +1165,8 @@ RegisterNUICallback('LCV:ADMIN:Houses:GetStreetName', function(data, cb)
         return
     end
     local coords = GetEntityCoords(ped)
-    local streetHash, crossingHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
-    local streetName = GetStreetNameFromHashKey(streetHash)
-    local crossName  = GetStreetNameFromHashKey(crossingHash)
+    local sHash, cHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
+    local streetName = GetStreetNameFromHashKey(sHash)
+    local crossName  = GetStreetNameFromHashKey(cHash)
     cb({ ok = true, street = streetName or '', cross = crossName or '' })
 end)

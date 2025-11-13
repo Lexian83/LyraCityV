@@ -158,7 +158,7 @@ local function HM_Admin_Houses_Add(data)
   local garage_size  = toN(data.garage_size, 0)
   local maxkeys      = toN(data.maxkeys, 0)
   local pincode      = (data.pincode and tostring(data.pincode) ~= '' and tostring(data.pincode)) or nil
-  local secured      = (toN(data.secured, 0) == 1) and 1 or 0  -- 👈 NEU
+  local secured      = (toN(data.secured, 0) == 1) and 1 or 0
 
   local allowed_bike        = (toN(data.allowed_bike,1) == 1) and 1 or 0
   local allowed_motorbike   = (toN(data.allowed_motorbike,1) == 1) and 1 or 0
@@ -168,21 +168,29 @@ local function HM_Admin_Houses_Add(data)
   local allowed_helicopter  = (toN(data.allowed_helicopter,0) == 1) and 1 or 0
   local allowed_boat        = (toN(data.allowed_boat,0) == 1) and 1 or 0
 
+  -- hier bei Bedarf ein Start-Spawn übernehmen; sonst NULL:
+  local garage_spawns = nil
+  -- if data.garage_x and data.garage_y and data.garage_z then
+  --   garage_spawns = json.encode({{ sid=1, type="both", x=toN(data.garage_x,0), y=toN(data.garage_y,0), z=toN(data.garage_z,0), heading=0.0, radius=3.0 }})
+  -- end
+
   local id = MySQL.insert.await([[
     INSERT INTO houses
       (name, ownerid,
        entry_x, entry_y, entry_z,
        garage_trigger_x, garage_trigger_y, garage_trigger_z,
        garage_x, garage_y, garage_z,
-       price, rent, ipl, lock_state, secured,   -- 👈 secured direkt nach lock_state
+       garage_spawns,
+       price, buyed_at, rent, rent_start, data, lock_state, secured,
+       ipl, fridgeid, storeid,
        hotel, apartments, garage_size,
        allowed_bike, allowed_motorbike, allowed_car,
        allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
        maxkeys, `keys`, pincode)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?,           -- 👈 secured Wert
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?,
             ?, ?, ?,
-            ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?)
   ]], {
     name,
@@ -190,8 +198,17 @@ local function HM_Admin_Houses_Add(data)
     toN(data.entry_x,0.0), toN(data.entry_y,0.0), toN(data.entry_z,0.0),
     toN(data.garage_trigger_x), toN(data.garage_trigger_y), toN(data.garage_trigger_z),
     toN(data.garage_x), toN(data.garage_y), toN(data.garage_z),
-    toN(data.price,0), toN(data.rent,0), toN(data.ipl),
-    secured,  -- 👈
+    garage_spawns,              -- 👈 NEU (JSON oder NULL)
+    toN(data.price,0),
+    nil,                        -- buyed_at
+    toN(data.rent,0),
+    nil,                        -- rent_start
+    nil,                        -- data (frei für spätere Metadaten)
+    1,                          -- lock_state (standard: 1)
+    secured,                    -- secured
+    toN(data.ipl),
+    nil,                        -- fridgeid
+    nil,                        -- storeid
     hotel, apartments, garage_size,
     allowed_bike, allowed_motorbike, allowed_car,
     allowed_truck, allowed_plane, allowed_helicopter, allowed_boat,
@@ -202,14 +219,14 @@ local function HM_Admin_Houses_Add(data)
 
   local dataJson = jenc({ houseid = id })
 
-  -- ENTRY
+  -- ENTRY interaction
   MySQL.insert.await([[
     INSERT INTO interaction_points
       (name, description, type, x, y, z, radius, enabled, data)
     VALUES ('HOUSE', ?, 'house', ?, ?, ?, ?, 1, ?)
   ]], { name, toN(data.entry_x,0.0), toN(data.entry_y,0.0), toN(data.entry_z,0.0), radius, dataJson })
 
-  -- GARAGE
+  -- GARAGE interaction
   if data.garage_trigger_x and data.garage_trigger_y and data.garage_trigger_z then
     MySQL.insert.await([[
       INSERT INTO interaction_points
@@ -234,6 +251,7 @@ local function HM_Admin_Houses_Add(data)
   TriggerEvent('LCV:house:forceSync')
   return { ok=true, id=id }
 end
+
 
 
 local function HM_Admin_Houses_Update(data)
@@ -266,8 +284,7 @@ local function HM_Admin_Houses_Update(data)
         entry_x = ?, entry_y = ?, entry_z = ?,
         garage_trigger_x = ?, garage_trigger_y = ?, garage_trigger_z = ?,
         garage_x = ?, garage_y = ?, garage_z = ?,
-        price = ?, rent = ?, ipl = ?, lock_state = 1, secured = ?,   -- 👈 secured mit setzen
-        hotel = ?, apartments = ?, garage_size = ?,
+        price = ?, rent = ?, ipl = ?, lock_state = 1, secured = ?,
         allowed_bike = ?, allowed_motorbike = ?, allowed_car = ?,
         allowed_truck = ?, allowed_plane = ?, allowed_helicopter = ?, allowed_boat = ?,
         maxkeys = ?, pincode = ?

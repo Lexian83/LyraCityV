@@ -99,9 +99,8 @@ Vue.component("tab-houses", {
     async addSpawnFromPos() {
       if (!this.editDialog.visible || !this.editDialog.form?.id) {
         // ⬅️ Guard
-        alert(
-          "Spawns können erst nach dem Anlegen im Bearbeiten-Dialog hinzugefügt werden."
-        );
+        this.editSpawns.error =
+          "Spawns erst nach dem Anlegen im Bearbeiten-Dialog hinzufügen.";
         return;
       }
       const pos = await this.nuiCall("LCV:ADMIN:Npcs:GetPlayerPos");
@@ -130,7 +129,7 @@ Vue.component("tab-houses", {
     async deleteSpawn(sid) {
       if (!this.editDialog.visible || !this.editDialog.form?.id) {
         // ⬅️ Guard
-        return alert("Nur im Bearbeiten-Dialog möglich.");
+        this.editSpawns.error = "Nur im Bearbeiten-Dialog möglich.";
       }
       const res = await this.nuiCall("LCV:ADMIN:Houses:GarageSpawns:Delete", {
         id: this.editDialog.form.id,
@@ -892,17 +891,20 @@ Vue.component("tab-houses", {
           </div>
         </div>
 <!-- Zeile: Garage Spawns -->
-<div class="form-row cols-1">
+<div v-if="editDialog.visible && editDialog.form?.id"  class="form-row cols-1">
   <div class="field">
     <label>Garage-Ein-/Ausparkpunkte</label>
 
     <div class="add-actions" style="margin: 4px 0;">
       <div class="status" v-if="editSpawns.loading">Lade Spawns ...</div>
-      <div class="error" v-else-if="editSpawns.error">{{ editSpawns.error }}</div>
+      <div class="error" v-if="editSpawns.error">{{ editSpawns.error }}</div>
       <div class="btn-row">
-        <button class="modal-btn" type="button" @click="addSpawnFromPos">
-          + Spawn von Spieler-Position
-        </button>
+        <button class="modal-btn" type="button"
+        :disabled="!editDialog.form?.id"
+        @click="addSpawnFromPos">
+  + Spawn von Spieler-Position
+</button>
+
         <button class="modal-btn" type="button" @click="loadEditSpawns(editDialog.form.id)">
           Reload Spawns
         </button>
