@@ -131,28 +131,50 @@ local function db_updateState(charId, accountId, state)
 end
 
 local function db_createCharacter(accountId, data)
-    local name   = tostring(data.name or ''):gsub('^%s+', ''):gsub('%s+$', '')
-    local gender = toN(data.gender, 0)
-    if name == '' then return nil end
+    local name     = tostring(data.name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local gender   = tonumber(data.gender) or 0
+    local past     = tonumber(data.past) or 0
+    local permit   = tonumber(data.residence_permit) or 0
+    local dim      = tonumber(data.dimension) or 0
+    local health   = tonumber(data.health) or 200
+    local thirst   = tonumber(data.thirst) or 100
+    local food     = tonumber(data.food) or 100
+    local hx       = tonumber(data.pos and data.pos.x) or 0.0
+    local hy       = tonumber(data.pos and data.pos.y) or 0.0
+    local hz       = tonumber(data.pos and data.pos.z) or 0.0
+    local heading  = tonumber(data.heading) or 0.0
 
-    local id = MySQL.insert.await([[
+    -- WICHTIG: beide Felder mitschreiben (Spalten ohne Default!)
+    local birthdate        = tostring(data.birthdate or '2000-01-01')         -- DATE 'YYYY-MM-DD'
+    local heritage_country = tostring(data.heritage_country or '')            -- z.B. 'DE'
+
+    local appearance = json.encode(data.appearance or {})
+    local clothes    = json.encode(data.clothes or {})
+
+    return MySQL.insert.await([[
         INSERT INTO characters
             (account_id, name, gender, level, type,
              is_locked, residence_permit, past,
              dimension, health, thirst, food,
              pos_x, pos_y, pos_z, heading,
-             appearance, clothes)
+             appearance, clothes,
+             birthdate, heritage_country)
         VALUES (?, ?, ?, 1, 0,
-                0, 0, 0,
-                0, 200, 100, 100,
-                0.0, 0.0, 0.0, 0.0,
+                0, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?,
                 ?, ?)
     ]], {
-        accountId, name, gender,
-        json.encode(data.appearance or {}), json.encode(data.clothes or {})
+        tonumber(accountId), name, gender,
+        permit, past,
+        dim, health, thirst, food,
+        hx, hy, hz, heading,
+        appearance, clothes,
+        birthdate, heritage_country
     })
-    return id
 end
+
 
 local function db_deleteCharacterOwned(charId, accountId)
     return MySQL.update.await('DELETE FROM characters WHERE id=? AND account_id=?', { charId, accountId })

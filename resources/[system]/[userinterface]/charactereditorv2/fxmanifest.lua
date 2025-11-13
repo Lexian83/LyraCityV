@@ -17,11 +17,16 @@ shared_scripts {
 }
 
 server_scripts {
-    '@oxmysql/lib/MySQL.lua',
     'server/startup.lua'
 }
 
 client_scripts {
     'client/editor.lua',
     'client/camera.lua'
+}
+
+dependencies {
+    'playerManager',   -- ✅ wir speichern nur über den Manager
+    'inputmanager',    -- UI open/close from your client/editor.lua
+    'ox_lib'
 }
