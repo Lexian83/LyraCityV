@@ -2,6 +2,7 @@ let state = {
   canCreate: false,
   maxCharacters: 2,
   characters: [],
+  isNewAccount: false, // 👈 neu
 };
 
 function statusClass(s) {
@@ -14,6 +15,7 @@ function statusText(s) {
   if (s === "wildlife") return "WILDLIFE";
   return "NORMAL";
 }
+
 // -------- Gender Badge --------
 function normGender(val) {
   // erst numerisch versuchen
@@ -47,7 +49,7 @@ function render() {
   const wrap = document.createElement("div");
   wrap.className = "tiles";
 
-  // Filter locked characters
+  // Nur nicht-gesperrte Chars
   const items = state.characters.filter((c) => !c.is_locked);
 
   items.forEach((c) => {
@@ -59,6 +61,7 @@ function render() {
         method: "POST",
         body: JSON.stringify({ id: c.id }),
       });
+
     const g = normGender(c.gender);
     tile.dataset.gender = g;
 
@@ -83,7 +86,8 @@ function render() {
 
     const dob = document.createElement("div");
     dob.className = "dob";
-    dob.textContent = c.birthdate || "ICH FEHLE";
+    // Server liefert "birthdate" (YYYY-MM-DD) und "birthday" (DD.MM.YYYY)
+    dob.textContent = c.birthdate || c.birthday || "ICH FEHLE";
 
     const status = document.createElement("div");
     status.className = statusClass(c.status);
@@ -98,7 +102,15 @@ function render() {
     wrap.appendChild(tile);
   });
 
-  if (state.canCreate && items.length < state.maxCharacters) {
+  // 👉 Plus-Kachel NUR, wenn:
+  // - Server sagt canCreate == true
+  // - Account ist wirklich "neu" (accounts.new == 1)
+  // - und wir unterhalb des maxCharacters-Limits sind
+  if (
+    state.canCreate &&
+    state.isNewAccount &&
+    items.length < state.maxCharacters
+  ) {
     const tile = document.createElement("button");
     tile.className = "tile";
     tile.onclick = () =>
@@ -120,6 +132,7 @@ function render() {
 window.addEventListener("message", (e) => {
   const { action, payload } = e.data || {};
   if (action === "setData" && payload) {
+    // payload enthält jetzt zusätzlich isNewAccount
     state = Object.assign({}, state, payload);
   }
   if (action === "open") {

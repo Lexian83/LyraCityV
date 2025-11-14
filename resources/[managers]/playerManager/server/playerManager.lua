@@ -1,6 +1,6 @@
 -- resources/playerManager/server/playerManager.lua
 -- LyraCityV - Player / Character Lifecycle & Autosave
--- Version 1.3.0 (pure oxmysql)
+-- Version 1.3.1 (pure oxmysql, account.new-Flag Fix)
 
 local json = json
 
@@ -64,10 +64,10 @@ end
 local function buildSpawnData(full)
     full = sanitizeCharacter(full)
     if not full then return nil end
-print(('[DEBUG][playerManager][playerManager.lua - Server - buildSpawnData] Residence Permit: %s | Past: %s'):format(full.residence_permit,full.past))
+    print(('[DEBUG][playerManager][playerManager.lua - Server - buildSpawnData] Residence Permit: %s | Past: %s'):format(full.residence_permit,full.past))
     local x, y, z, heading
     if (full.residence_permit or 0) >= 1 then
-        x, y, z, heading = full.pos_x, full.pos_y, full.pos_z, full.heading --Letze Spieler Position weil eingereist
+        x, y, z, heading = full.pos_x, full.pos_y, full.pos_z, full.heading -- Letze Spieler Position weil eingereist
     elseif full.residence_permit == 0 and (full.past or 0) == 0 then -- Flughafen weil nicht eingereist und legaler weg
         x, y, z, heading = -1111.24, -2843.37, 14.89, 267.78
     elseif full.residence_permit == 0 and (full.past or 0) == 1 then -- Prison weil nicht eingereist und Illegaler weg
@@ -173,7 +173,7 @@ local function db_createCharacter(accountId, data)
              pos_x, pos_y, pos_z, heading,
              appearance, clothes,
              birthdate, heritage_country)
-        VALUES (?, ?, ?, 1, 0,
+        VALUES (?, ?, ?, 0, 0,
                 0, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
@@ -189,6 +189,20 @@ local function db_createCharacter(accountId, data)
     })
 end
 
+-- >>> NEU: Account nach erster Char-Erstellung nicht mehr "neu"
+local function db_markAccountNotNew(accountId)
+    accountId = tonumber(accountId)
+    if not accountId then return 0 end
+
+    local affected = MySQL.update.await('UPDATE accounts SET new = 0 WHERE id = ?', { accountId })
+    if affected and affected > 0 then
+        log('DEBUG', ('Account %s als "nicht neu" markiert (accounts.new = 0).'):format(accountId))
+    else
+        log('DEBUG', ('Account %s konnte nicht als "nicht neu" markiert werden (affected=%s).'):format(accountId, tostring(affected)))
+    end
+    return affected
+end
+-- <<< ENDE NEU
 
 local function db_deleteCharacterOwned(charId, accountId)
     return MySQL.update.await('DELETE FROM characters WHERE id=? AND account_id=?', { charId, accountId })
@@ -355,6 +369,10 @@ RegisterNetEvent('LCV:Player:CreateCharacter', function(data)
     local newId = db_createCharacter(s.account_id, data)
     if not newId then return TriggerClientEvent('LCV:error', src, "Fehler beim Erstellen des Charakters.") end
 
+    -- >>> NEU: Account ist jetzt nicht mehr "neu"
+    db_markAccountNotNew(s.account_id)
+    -- <<< ENDE NEU
+
     log("INFO", ("Charakter erstellt: account_id=%s char_id=%s name=%s"):format(s.account_id, newId, name))
     TriggerClientEvent('LCV:charCreated', src, { id = newId, name = name, gender = data.gender or 0 })
 end)
@@ -459,6 +477,10 @@ exports('GetPlayerData', function(src) src = tonumber(src); return PlayerData[sr
 
 exports('CreateCharacter', function(accountId, data, cb)
     local id = db_createCharacter(accountId, data or {})
+    if id then
+        -- >>> NEU: auch bei externen Char-Erstellungen Account nicht mehr als "neu" behandeln
+        db_markAccountNotNew(accountId)
+    end
     if cb then cb(id) end
 end)
 
@@ -598,7 +620,7 @@ local function listCharactersByAccount(accountId)
     ORDER BY id ASC
   ]], { accountId }) or {}
 
-for i=1,#rows do
+  for i=1,#rows do
     rows[i].is_locked = (rows[i].is_locked == 1 or rows[i].is_locked == true)
 
     -- Datum hübsch & garantiert als String
@@ -624,11 +646,9 @@ for i=1,#rows do
     end
     -- Fallback: nie nil an die UI geben
     if rows[i].birthdate == nil or rows[i].birthdate == '' then
-        rows[i].birthdate = ''   -- oder '-' wenn du lieber einen Bindestrich willst
+        rows[i].birthdate = ''
     end
-end
-
-
+  end
 
   return { ok = true, characters = rows }
 end

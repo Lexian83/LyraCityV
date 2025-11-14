@@ -2,20 +2,25 @@
 -- Hängt jetzt ausschließlich am playerManager
 
 local MAX_CHARACTERS = 6
+
 local function fmtBirthdate(val, mode)
   -- mode: 'iso' -> YYYY-MM-DD, 'de' -> DD.MM.YYYY
   mode = mode or 'de'
   if not val then return '' end
   if type(val) == 'table' and val.year then
     -- falls oxmysql mal als table liefert (selten)
-    local y,m,d = val.year, val.month, val.day
-    return (mode=='iso') and (('%04d-%02d-%02d'):format(y,m,d)) or (('%02d.%02d.%04d'):format(d,m,y))
+    local y, m, d = val.year, val.month, val.day
+    return (mode == 'iso')
+      and (('%04d-%02d-%02d'):format(y, m, d))
+      or  (('%02d.%02d.%04d'):format(d, m, y))
   end
   if type(val) == 'string' then
-    local y,m,d = val:match('^(%d%d%d%d)%-(%d%d)%-(%d%d)$')  -- DATE 'YYYY-MM-DD'
+    local y, m, d = val:match('^(%d%d%d%d)%-(%d%d)%-(%d%d)$')  -- DATE 'YYYY-MM-DD'
     if y and m and d then
-      y,m,d = tonumber(y), tonumber(m), tonumber(d)
-      return (mode=='iso') and (('%04d-%02d-%02d'):format(y,m,d)) or (('%02d.%02d.%04d'):format(d,m,y))
+      y, m, d = tonumber(y), tonumber(m), tonumber(d)
+      return (mode == 'iso')
+        and (('%04d-%02d-%02d'):format(y, m, d))
+        or  (('%02d.%02d.%04d'):format(d, m, y))
     end
   end
   return ''
@@ -40,12 +45,35 @@ local function PM()
   return nil
 end
 
+-- Prüft, ob Account noch "neu" ist (accounts.new = 1)
+local function isAccountNew(accountId)
+  accountId = tonumber(accountId)
+  if not accountId then return false end
+  if not MySQL then
+    slog("error", "MySQL ist nil, kann accounts.new nicht prüfen")
+    return false
+  end
+
+  local row = MySQL.single.await("SELECT new FROM accounts WHERE id = ?", { accountId })
+  if not row or row.new == nil then
+    return false
+  end
+
+  local v = row.new
+  if type(v) == "boolean" then
+    return v
+  end
+
+  local n = tonumber(v) or 0
+  return n == 1
+end
+
 -- Lädt alle Charaktere eines Accounts über playerManager-Export
 local function loadCharactersForAccount(accountId, cb)
   local pm = PM()
   if not pm or not pm.ListCharactersByAccount then
     slog("error", "playerManager Export ListCharactersByAccount nicht verfügbar")
-    return cb({ canCreate=false, maxCharacters=MAX_CHARACTERS, characters={} })
+    return cb({ canCreate = false, maxCharacters = MAX_CHARACTERS, characters = {} })
   end
 
   local ok, res = pcall(function()
@@ -54,29 +82,29 @@ local function loadCharactersForAccount(accountId, cb)
 
   if not ok or not res or res.ok ~= true or type(res.characters) ~= "table" then
     slog("error", "ListCharactersByAccount fehlgeschlagen")
-    return cb({ canCreate=false, maxCharacters=MAX_CHARACTERS, characters={} })
+    return cb({ canCreate = false, maxCharacters = MAX_CHARACTERS, characters = {} })
   end
 
   local characters = {}
   for _, r in ipairs(res.characters) do
     local bdIso = fmtBirthdate(r.birthdate, 'iso')  -- "YYYY-MM-DD"
-local bdDe  = fmtBirthdate(r.birthdate, 'de')   -- "DD.MM.YYYY"
+    local bdDe  = fmtBirthdate(r.birthdate, 'de')   -- "DD.MM.YYYY"
 
-characters[#characters + 1] = {
-  id        = r.id,
-  accountid = r.account_id,
-  name      = r.name or ("Char #" .. r.id),
-  gender    = r.gender,
-  -- 👇 liefere mehrere Keys, damit die UI garantiert was findet:
-  birthdate        = bdIso,  -- falls UI "birthdate" erwartet
-  birthday         = bdDe,   -- falls UI "birthday" erwartet
-  birthdateDisplay = bdDe,   -- explizites Anzeige-Feld
-  birthdate_raw    = r.birthdate, -- debugging/kompat
-  type      = r.type or 0,
-  is_locked = (r.is_locked == true),
-  status    = r.status,
-  portrait  = r.portrait,
-}
+    characters[#characters + 1] = {
+      id        = r.id,
+      accountid = r.account_id,
+      name      = r.name or ("Char #" .. r.id),
+      gender    = r.gender,
+      -- mehrere Keys, damit die UI garantiert was findet:
+      birthdate        = bdIso,   -- falls UI "birthdate" erwartet
+      birthday         = bdDe,    -- falls UI "birthday" erwartet
+      birthdateDisplay = bdDe,    -- explizites Anzeige-Feld
+      birthdate_raw    = r.birthdate,
+      type      = r.type or 0,
+      is_locked = (r.is_locked == true),
+      status    = r.status,
+      portrait  = r.portrait,
+    }
   end
 
   local canCreate = (#characters < MAX_CHARACTERS)
@@ -87,7 +115,7 @@ end
 local function buildPayload(src, rawAccountId, cb)
   src = tonumber(src)
   if not src or src <= 0 then
-    return cb({ canCreate=false, maxCharacters=MAX_CHARACTERS, characters={} }, nil)
+    return cb({ canCreate = false, maxCharacters = MAX_CHARACTERS, characters = {} }, nil)
   end
 
   local accountId = tonumber(rawAccountId)
@@ -101,10 +129,21 @@ local function buildPayload(src, rawAccountId, cb)
 
   if not accountId then
     slog("warn", ("buildPayload: kein accountId für src=%s"):format(src))
-    return cb({ canCreate=false, maxCharacters=MAX_CHARACTERS, characters={} }, nil)
+    return cb({ canCreate = false, maxCharacters = MAX_CHARACTERS, characters = {} }, nil)
   end
 
+  -- 👉 Hier holen wir accounts.new
+  local isNew = isAccountNew(accountId)
+
   loadCharactersForAccount(accountId, function(payload)
+    -- Flag mitgeben
+    payload.isNewAccount = isNew
+
+    -- Sicherheit: wenn Account NICHT neu -> darf nicht erstellen
+    if not isNew then
+      payload.canCreate = false
+    end
+
     cb(payload, accountId)
   end)
 end
@@ -126,8 +165,14 @@ AddEventHandler("LCV:charselect:load", function(targetSrc, accountId)
 
   buildPayload(src, accountId, function(payload, resolvedAccountId)
     TriggerClientEvent("LCV:charselect:show", src, payload, resolvedAccountId or accountId)
-    slog("info", ("CharSelect opened for %s (acc=%s chars=%d canCreate=%s)")
-      :format(GetPlayerName(src) or src, tostring(resolvedAccountId or accountId), #(payload.characters or {}), tostring(payload.canCreate)))
+    slog("info", ("CharSelect opened for %s (acc=%s chars=%d canCreate=%s isNew=%s)")
+      :format(
+        GetPlayerName(src) or src,
+        tostring(resolvedAccountId or accountId),
+        #(payload.characters or {}),
+        tostring(payload.canCreate),
+        tostring(payload.isNewAccount)
+      ))
   end)
 end)
 
@@ -136,8 +181,14 @@ RegisterNetEvent("LCV:charselect:reload", function()
   if src <= 0 then return end
   buildPayload(src, nil, function(payload, resolvedAccountId)
     TriggerClientEvent("LCV:charselect:show", src, payload, resolvedAccountId)
-    slog("info", ("CharSelect reload for %s (acc=%s chars=%d canCreate=%s)")
-      :format(GetPlayerName(src) or src, tostring(resolvedAccountId), #(payload.characters or {}), tostring(payload.canCreate)))
+    slog("info", ("CharSelect reload for %s (acc=%s chars=%d canCreate=%s isNew=%s)")
+      :format(
+        GetPlayerName(src) or src,
+        tostring(resolvedAccountId),
+        #(payload.characters or {}),
+        tostring(payload.canCreate),
+        tostring(payload.isNewAccount)
+      ))
   end)
 end)
 
