@@ -1,44 +1,52 @@
--- housing/client.lua
+-- resources/housing/client.lua
 
+local currentHouse = {
+    id   = nil,
+    name = nil,
+}
 
-local function openHousing()
-    -- NUI anzeigen
-    SendNUIMessage({ action = "openHousing" })
+local function openHousing(data)
+    currentHouse.id   = data and data.houseId   or nil
+    currentHouse.name = data and data.houseName or nil
 
-    -- ganz kleines Delay, damit Prop/Anim zuerst sitzt
+    SendNUIMessage({
+        action    = "openHousing",
+        houseId   = currentHouse.id,
+        houseName = currentHouse.name,
+    })
+
     CreateThread(function()
         Wait(200)
         SetNuiFocus(true, true)
-        SetNuiFocusKeepInput(true) -- erlaubt WASD + UI
+        SetNuiFocusKeepInput(true)
     end)
+
     exports.inputmanager:LCV_OpenUI('Housing', { nui = true, keepInput = false })
-    print("[HOUSING][CLIENT] Get Trigger to Open from Netevent")
+    print("[HOUSING][CLIENT] Open UI (houseId="..tostring(currentHouse.id)..")")
 end
 
-
 local function closeHousing()
-      -- NUI schließen
     SendNUIMessage({ action = "closeHousing" })
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
     exports.inputmanager:LCV_CloseUI('Housing')
+    currentHouse.id   = nil
+    currentHouse.name = nil
 end
--- Events from your main Phone resource
-RegisterNetEvent('LCV:Housing:Client:Show', function()
-    openHousing()
-    print("[HOUSING][CLIENT] Get Trigger to Open from inputmanager")
+
+RegisterNetEvent('LCV:Housing:Client:Show', function(data)
+    openHousing(data)
 end)
 
 RegisterNetEvent('LCV:Housing:Client:Hide', function()
     closeHousing()
 end)
 
--- NUI callback (optional; harmless if also handled elsewhere)
 RegisterNUICallback('LCV:Housing:Hide', function(_, cb)
-        closeHousing()
+    closeHousing()
+    if cb then cb('ok') end
 end)
 
--- Cleanup
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then
         closeHousing()

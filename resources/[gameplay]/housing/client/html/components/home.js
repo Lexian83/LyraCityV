@@ -1,11 +1,7 @@
 Vue.component("tab-home", {
-  props: ["identity"],
+  props: ["identity", "houseName"],
   data() {
     return {
-      house: {
-        address: "Musterstraße 12, 12345 Lyra City",
-        owner: "Max Mustermann",
-      },
       // reine Anzeige (oben)
       locked: true, // 🔒 rot (abgeschlossen) / grün (aufgeschlossen)
       bellOn: false, // 🔔 weiß (off) / rot (on)
@@ -16,15 +12,13 @@ Vue.component("tab-home", {
     };
   },
   computed: {
-    lockLabel() {
-      return this.locked ? "Aufschließen" : "Abschließen";
+    displayAddress() {
+      return this.houseName && this.houseName !== ""
+        ? this.houseName
+        : "Unbekanntes Haus";
     },
-    lockIcon() {
-      return this.locked ? "fa-lock-open" : "fa-lock";
-    }, // für Button im Grid
   },
   methods: {
-    // Actions – aktuell nur Dummy-Logs
     actionRing() {
       console.log("[HOUSING] Klingeln gedrückt");
     },
@@ -37,8 +31,6 @@ Vue.component("tab-home", {
     actionBreakIn() {
       console.log("[HOUSING] Einbrechen gedrückt");
     },
-
-    // Lock-Status nur lokal toggeln (Dummy) – wird jetzt über Button im Grid getriggert
     actionToggleLock() {
       this.locked = !this.locked;
       console.log(
@@ -46,8 +38,6 @@ Vue.component("tab-home", {
         this.locked ? "abgeschlossen" : "aufgeschlossen"
       );
     },
-
-    // Numpad
     press(n) {
       if (this.codeInput.length < 8) this.codeInput += String(n);
     },
@@ -60,7 +50,6 @@ Vue.component("tab-home", {
     confirm() {
       console.log("[HOUSING] Code bestätigt:", this.codeInput);
     },
-
     setParameter(parameter, value) {
       this.identity[parameter] = value;
     },
@@ -86,28 +75,24 @@ Vue.component("tab-home", {
 
         <div class="card">
           <div class="title">Adresse</div>
-          <div class="value">{{ house.address }}</div>
+          <div class="value">{{ displayAddress }}</div>
         </div>
         <div class="card">
           <div class="title">Besitzer</div>
-          <div class="value">{{ house.owner }}</div>
+          <div class="value">Noch nicht verfügbar</div>
         </div>
 
         <div class="divider"></div>
 
-        <!-- 4er-Grid: Klingeln, Auf-/Zu, Nachricht, Einbrechen -->
         <div class="actions-grid">
           <button class="btn-action" @click="actionRing">
             <i class="fa-regular fa-bell"></i>
             <span>Klingeln</span>
           </button>
-
-          <!-- getauscht: Lock-Toggle jetzt im Grid -->
           <button class="btn-action" @click="actionToggleLock">
-            <i class="fa-solid" :class="lockIcon"></i>
-            <span>{{ lockLabel }}</span>
+            <i class="fa-solid" :class="locked ? 'fa-lock-open' : 'fa-lock'"></i>
+            <span>{{ locked ? 'Aufschließen' : 'Abschließen' }}</span>
           </button>
-
           <button class="btn-action" @click="actionMessage">
             <i class="fa-regular fa-message"></i>
             <span>Nachricht</span>
@@ -118,7 +103,6 @@ Vue.component("tab-home", {
           </button>
         </div>
 
-        <!-- Einzelner großer Button: Betreten -->
         <button class="btn-enter" @click="actionEnter">
           <i class="fa-solid fa-door-open"></i>
           <span>Betreten</span>
@@ -139,12 +123,13 @@ Vue.component("tab-home", {
             <button class="key" @click="press(7)">7</button>
             <button class="key" @click="press(8)">8</button>
             <button class="key" @click="press(9)">9</button>
-            <button class="key subtle" @click="clearAll">C</button>
+            <button class="key subtle" @click="clearAll">CLR</button>
             <button class="key" @click="press(0)">0</button>
-            <button class="key subtle" @click="backspace"><i class="fa-solid fa-delete-left"></i></button>
+            <button class="key subtle" @click="backspace">DEL</button>
           </div>
           <button class="btn-confirm" @click="confirm">
-            <i class="fa-solid fa-check"></i> Bestätigen
+            <i class="fa-solid fa-check"></i>
+            <span>Code bestätigen</span>
           </button>
         </div>
       </div>

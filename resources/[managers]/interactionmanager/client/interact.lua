@@ -135,6 +135,7 @@ RegisterNetEvent('LCV:world:interact', function()
       -- Housing Trigger
     elseif etype == 'house' then
       TriggerEvent('LCV:Housing:Client:Show',target)
+      print(('HAUS DATEN: DATA: %s'):format(target.data))
       lib.notify({ description = "Dies ist ein HAUSTRIGGER", type = "info" })
     return
 

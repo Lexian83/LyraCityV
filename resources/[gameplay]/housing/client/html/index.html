@@ -12,7 +12,6 @@
   </head>
 
   <body>
-  <body>
     <div id="app" v-if="show">
       <div class="content">
         <div class="screen">
@@ -21,27 +20,21 @@
           </div>
           <component
             v-bind:is="getTabComponent"
-            v-bind="{identity}"
+            v-bind="{ identity, houseName }"
           ></component>
           <div class="bottombar">
             <div class="icons">
-              <button 
-          class="close-btn2"
-          @click.stop.prevent="closePhone"
-          aria-label="Schließen"
-        >
-        <i class="fa-solid fa-power-off"></i>
-          <!--<img src="ifruit_logo.png" alt="iFruit Logo"/>-->
-        </button>
+              <button
+                class="close-btn2"
+                @click.stop.prevent="closePhone"
+                aria-label="Schließen"
+              >
+                <i class="fa-solid fa-power-off"></i>
+              </button>
             </div>
           </div>
         </div>
       </div>
-      <!--<div class="navBar">
-        <button @click="goTo(0)" :class="isActive(0)">
-          <img class="icon" src="icons/id-card.png" />
-        </button>
-      </div>-->
     </div>
     <script src="vue.min.js"></script>
     <script src="utility/menuNames.js"></script>

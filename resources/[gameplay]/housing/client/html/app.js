@@ -9,6 +9,8 @@ const app = new Vue({
       selection: 0,
       identity: { fname: "", sname: "", birthdate: "", country: "", past: 0 },
       navOptions: ["Home"],
+
+      houseName: "Lade Hausdaten...",
     };
   },
   computed: {
@@ -16,43 +18,32 @@ const app = new Vue({
       if (this.selection >= this.navOptions.length - 1) {
         return { inactive: true };
       }
-
       return { inactive: false };
     },
     isInactiveBack() {
       if (this.selection <= 0) {
         return { inactive: true };
       }
-
       return { inactive: false };
     },
-    getTabComponent: function () {
+    getTabComponent() {
       return `tab-${this.navOptions[this.selection].toLowerCase()}`;
     },
   },
   methods: {
     goNext() {
-      if (this.selection >= this.navOptions.length - 1) {
-        return;
-      }
-
+      if (this.selection >= this.navOptions.length - 1) return;
       this.selection += 1;
     },
     goBack() {
-      if (this.selection <= 0) {
-        return;
-      }
-
+      if (this.selection <= 0) return;
       this.selection -= 1;
     },
     goTo(selection) {
       this.selection = selection;
     },
     isActive(values) {
-      // Wenn ein einzelner Wert übergeben wird, mach ihn zu einem Array
       if (!Array.isArray(values)) values = [values];
-
-      // true, wenn selection in der Liste vorkommt
       const active = values.includes(this.selection);
       return { active };
     },
@@ -64,21 +55,34 @@ const app = new Vue({
         fetch(`https://${GetParentResourceName()}/LCV:Housing:Hide`, {
           method: "POST",
         });
-      }, 800); // warte bis Fade-Out fertig
+      }, 800);
+    },
+
+    applyHousingPayload(payload) {
+      // payload von Client: { houseId, houseName }
+      if (!payload) return;
+      if (payload.houseName && payload.houseName !== "") {
+        this.houseName = payload.houseName;
+      } else if (payload.houseId) {
+        this.houseName = `Haus #${payload.houseId}`;
+      } else {
+        this.houseName = "Unbekanntes Haus";
+      }
     },
   },
   mounted() {
     window.addEventListener("message", (event) => {
-      let data = event.data;
-      if (data.action == "openHousing") {
-        if (this.show) {
-          return;
+      const data = event.data || {};
+
+      if (data.action === "openHousing") {
+        if (!this.show) {
+          this.applyHousingPayload(data);
+          this.show = true;
         }
-        this.show = true;
-        console.log("[HOUSING][CLIENT] Get Trigger to Open");
-      } else if (data.action == "closeHousing") {
+        console.log("[HOUSING][NUI] openHousing", data);
+      } else if (data.action === "closeHousing") {
         this.show = false;
-        console.log("[Housing][CLIENT] Get Trigger to Hide");
+        console.log("[HOUSING][NUI] closeHousing");
       }
     });
   },

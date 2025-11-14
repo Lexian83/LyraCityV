@@ -581,3 +581,43 @@ exports('Admin_Houses_GarageSpawns_List',   HM_Admin_Houses_GarageSpawns_List)
 exports('Admin_Houses_GarageSpawns_Add',    HM_Admin_Houses_GarageSpawns_Add)
 exports('Admin_Houses_GarageSpawns_Update', HM_Admin_Houses_GarageSpawns_Update)
 exports('Admin_Houses_GarageSpawns_Delete', HM_Admin_Houses_GarageSpawns_Delete)
+-- ===== OPTIONAL: GetAll für andere Module =====
+local function HM_GetAll()
+  local rows = MySQL.query.await([[
+    SELECT 
+      h.*,
+      i.radius AS interaction_radius
+    FROM houses h
+    LEFT JOIN interaction_points i
+      ON i.name = 'HOUSE'
+     AND JSON_EXTRACT(i.data, '$.houseid') = h.id
+    ORDER BY h.id ASC
+  ]]) or {}
+  for i=1,#rows do rows[i] = normalize_house(rows[i]) end
+  return rows
+end
+
+-- Ein einzelnes Haus nach ID holen
+local function HM_GetById(houseId)
+  houseId = toN(houseId)
+  if not houseId then return nil end
+
+  local row = MySQL.single.await([[
+    SELECT 
+      h.*,
+      i.radius AS interaction_radius
+    FROM houses h
+    LEFT JOIN interaction_points i
+      ON i.name = 'HOUSE'
+     AND JSON_EXTRACT(i.data, '$.houseid') = h.id
+    WHERE h.id = ?
+    LIMIT 1
+  ]], { houseId }) or nil
+
+  if not row then return nil end
+  return normalize_house(row)
+end
+
+exports('GetById', HM_GetById)
+exports('GetAll', HM_GetAll)
+

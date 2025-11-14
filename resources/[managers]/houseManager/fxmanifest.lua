@@ -27,6 +27,10 @@ server_exports {
     'getanzahlapartments',
     'getsecured',
 
+    -- SSOT-Lese-Exports
+    'GetAll',
+    'GetById',
+
     -- Admin/SSOT (neu)
     'Admin_Houses_GetAll',
     'Admin_Houses_Add',
