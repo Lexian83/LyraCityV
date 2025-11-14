@@ -1,5 +1,5 @@
 Vue.component("tab-home", {
-  props: ["identity", "houseName"],
+  props: ["identity", "houseName", "ownerStatus"],
   data() {
     return {
       // reine Anzeige (oben)
@@ -16,6 +16,16 @@ Vue.component("tab-home", {
       return this.houseName && this.houseName !== ""
         ? this.houseName
         : "Unbekanntes Haus";
+    },
+    displayOwner() {
+      if (!this.ownerStatus || this.ownerStatus === "") {
+        return "Unbekannt";
+      }
+      const v = String(this.ownerStatus).toLowerCase();
+      if (v === "frei") return "Frei";
+      if (v === "verkauft") return "Verkauft";
+      if (v === "vermietet") return "Vermietet";
+      return this.ownerStatus;
     },
   },
   methods: {
@@ -79,7 +89,7 @@ Vue.component("tab-home", {
         </div>
         <div class="card">
           <div class="title">Besitzer</div>
-          <div class="value">Noch nicht verfügbar</div>
+          <div class="value">{{ displayOwner }}</div>
         </div>
 
         <div class="divider"></div>
@@ -90,46 +100,34 @@ Vue.component("tab-home", {
             <span>Klingeln</span>
           </button>
           <button class="btn-action" @click="actionToggleLock">
-            <i class="fa-solid" :class="locked ? 'fa-lock-open' : 'fa-lock'"></i>
-            <span>{{ locked ? 'Aufschließen' : 'Abschließen' }}</span>
+            <i class="fa-solid fa-lock"></i>
+            <span>Auf-/Zusperren</span>
           </button>
           <button class="btn-action" @click="actionMessage">
-            <i class="fa-regular fa-message"></i>
+            <i class="fa-regular fa-envelope"></i>
             <span>Nachricht</span>
           </button>
           <button class="btn-action danger" @click="actionBreakIn">
-            <i class="fa-solid fa-mask"></i>
+            <i class="fa-solid fa-user-secret"></i>
             <span>Einbrechen</span>
           </button>
         </div>
-
-        <button class="btn-enter" @click="actionEnter">
-          <i class="fa-solid fa-door-open"></i>
-          <span>Betreten</span>
-        </button>
       </div>
 
+      <!-- Rechts: Keypad, Dummy-Inhalt etc. -->
       <div class="right">
-        <div class="pin-box">
-          <div class="pin-label">Codeeingabe</div>
-          <div class="pin-display">{{ codeInput.replace(/./g, "•") }}</div>
+        <div class="card">
+          <div class="title">PIN-Code</div>
+          <div class="keypad-display">{{ codeInput || '••••' }}</div>
           <div class="keypad-grid">
-            <button class="key" @click="press(1)">1</button>
-            <button class="key" @click="press(2)">2</button>
-            <button class="key" @click="press(3)">3</button>
-            <button class="key" @click="press(4)">4</button>
-            <button class="key" @click="press(5)">5</button>
-            <button class="key" @click="press(6)">6</button>
-            <button class="key" @click="press(7)">7</button>
-            <button class="key" @click="press(8)">8</button>
-            <button class="key" @click="press(9)">9</button>
-            <button class="key subtle" @click="clearAll">CLR</button>
-            <button class="key" @click="press(0)">0</button>
-            <button class="key subtle" @click="backspace">DEL</button>
+            <button v-for="n in 9" :key="n" @click="press(n)">{{ n }}</button>
+            <button @click="clearAll">C</button>
+            <button @click="press(0)">0</button>
+            <button @click="backspace">&larr;</button>
           </div>
-          <button class="btn-confirm" @click="confirm">
+          <button class="btn-action" style="margin-top: 6px;" @click="confirm">
             <i class="fa-solid fa-check"></i>
-            <span>Code bestätigen</span>
+            <span>Bestätigen</span>
           </button>
         </div>
       </div>

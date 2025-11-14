@@ -1,23 +1,21 @@
 -- resources/housing/client.lua
 
 local currentHouse = {
-    id   = nil,
-    name = nil,
+    id          = nil,
+    name        = nil,
+    ownerStatus = nil,
 }
 
 local function openHousing(data)
-    currentHouse.id   = data and data.houseId   or nil
-    currentHouse.name = data and data.houseName or nil
-
-    print(('[HOUSING][CLIENT] openHousing: houseId=%s houseName=%s'):format(
-        tostring(currentHouse.id),
-        tostring(currentHouse.name)
-    ))
+    currentHouse.id          = data and data.houseId      or nil
+    currentHouse.name        = data and data.houseName    or nil
+    currentHouse.ownerStatus = data and data.ownerStatus  or nil
 
     SendNUIMessage({
-        action    = "openHousing",
-        houseId   = currentHouse.id,
-        houseName = currentHouse.name,
+        action      = "openHousing",
+        houseId     = currentHouse.id,
+        houseName   = currentHouse.name,
+        ownerStatus = currentHouse.ownerStatus,
     })
 
     CreateThread(function()
@@ -27,7 +25,7 @@ local function openHousing(data)
     end)
 
     exports.inputmanager:LCV_OpenUI('Housing', { nui = true, keepInput = false })
-    print("[HOUSING][CLIENT] Open UI (houseId=" .. tostring(currentHouse.id) .. ")")
+    print("[HOUSING][CLIENT] Open UI (houseId=" .. tostring(currentHouse.id) .. ", status=" .. tostring(currentHouse.ownerStatus) .. ")")
 end
 
 local function closeHousing()
@@ -35,8 +33,9 @@ local function closeHousing()
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
     exports.inputmanager:LCV_CloseUI('Housing')
-    currentHouse.id   = nil
-    currentHouse.name = nil
+    currentHouse.id          = nil
+    currentHouse.name        = nil
+    currentHouse.ownerStatus = nil
 end
 
 RegisterNetEvent('LCV:Housing:Client:Show', function(data)
