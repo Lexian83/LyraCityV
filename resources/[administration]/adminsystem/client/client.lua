@@ -1215,3 +1215,24 @@ RegisterNUICallback('LCV:ADMIN:IPL:Unload', function(data, cb)
 
     cb({ ok = true, loaded = false, name = name })
 end)
+-- ===== TELEPORT TO COORDS (NUI) =====
+RegisterNUICallback('LCV:ADMIN:TeleportToCoords', function(data, cb)
+    local x = tonumber(data and data.x)
+    local y = tonumber(data and data.y)
+    local z = tonumber(data and data.z)
+
+    if not x or not y or not z then
+        cb({ ok = false, error = 'invalid_coords' })
+        return
+    end
+
+    local ped = PlayerPedId()
+    DoScreenFadeOut(250)
+    Wait(260)
+    SetEntityCoordsNoOffset(ped, x + 0.0, y + 0.0, z + 0.0, false, false, false)
+    ClearPedTasksImmediately(ped)
+    Wait(120)
+    DoScreenFadeIn(250)
+
+    cb({ ok = true })
+end)

@@ -33,6 +33,7 @@ Vue.component("tab-houses_ipl", {
         error: null,
       },
       addBusy: false,
+      tpBusy: false, // ⬅️ neu: Doppelklicks verhindern
     };
   },
 
@@ -47,17 +48,27 @@ Vue.component("tab-houses_ipl", {
   },
 
   methods: {
+    getResName() {
+      try {
+        return typeof GetParentResourceName === "function"
+          ? GetParentResourceName()
+          : "adminsystem";
+      } catch (e) {
+        return "adminsystem";
+      }
+    },
     async nuiCall(name, payload = {}) {
-      const res = await fetch(`https://${GetParentResourceName()}/${name}`, {
+      const res = await fetch(`https://${this.getResName()}/${name}`, {
         method: "POST",
         headers: { "Content-Type": "application/json; charset=UTF-8" },
         body: JSON.stringify(payload),
       });
+      const txt = await res.text();
+      if (!txt) return { ok: true }; // leere Response tolerant behandeln
       try {
-        return await res.json();
-      } catch (e) {
-        console.error("NUI JSON error for", name, e);
-        return { ok: false, error: "invalid_response" };
+        return JSON.parse(txt);
+      } catch {
+        return { ok: false, error: "invalid_json", raw: txt };
       }
     },
 
@@ -247,13 +258,37 @@ Vue.component("tab-houses_ipl", {
     },
 
     // TELEPORT zu posx/posy/posz
+    async teleportWithIpl(row) {
+      if (!row) return;
+      const x = row.posx,
+        y = row.posy,
+        z = row.posz;
+      if (x == null || y == null || z == null) {
+        this.addError = "Koordinaten (posx/posy/posz) fehlen.";
+        return;
+      }
+      try {
+        const ipl = (row.ipl || "").trim();
+        if (ipl) {
+          await this.nuiCall("LCV:ADMIN:IPL:Load", { name: ipl });
+          await new Promise((r) => setTimeout(r, 150)); // kurzes Preload
+        }
+        await this.nuiCall("LCV:ADMIN:TeleportToCoords", { x, y, z });
+      } catch (e) {
+        console.error("[ADMIN][HOUSES_IPL] teleportWithIpl error:", e);
+        this.addError = e.message || String(e);
+      }
+    },
+
+    // der eine Button ruft nur das hier:
     async teleport(row) {
-      await this.nuiCall("LCV:ADMIN:HousesIPL:Teleport", {
-        id: row.id,
-        x: row.posx,
-        y: row.posy,
-        z: row.posz,
-      });
+      if (this.tpBusy) return;
+      this.tpBusy = true;
+      try {
+        await this.teleportWithIpl(row);
+      } finally {
+        this.tpBusy = false;
+      }
     },
   },
 
@@ -293,9 +328,12 @@ Vue.component("tab-houses_ipl", {
               <td>{{ row.posx.toFixed(2) }}, {{ row.posy.toFixed(2) }}, {{ row.posz.toFixed(2) }}</td>
               <td>{{ row.exit_x.toFixed(2) }}, {{ row.exit_y.toFixed(2) }}, {{ row.exit_z.toFixed(2) }}</td>
               <td class="actions">
-                <button class="btn-icon" title="Teleport" @click="teleport(row)">
-                  <i class="fa-solid fa-location-arrow"></i>
-                </button>
+                <button class="btn-icon"
+        title="Teleport (lädt ggf. IPL)"
+        :disabled="tpBusy"
+        @click="teleport(row)">
+  <i class="fa-solid fa-location-arrow"></i>
+</button>
                 <button class="btn-icon" title="Bearbeiten" @click="openEdit(row)">
                   <i class="fa-solid fa-pen"></i>
                 </button>

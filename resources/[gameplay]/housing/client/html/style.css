@@ -356,3 +356,319 @@ body {
   transform: scale(1.2);
   opacity: 1;
 }
+/* === HOUSING HOME LAYOUT === */
+.housing-home {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+  padding: 10px 6px 14px;
+}
+
+.housing-home .left .card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+.housing-home .left .card .title {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+.housing-home .left .card .value {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.housing-home .divider {
+  height: 2px;
+  margin: 8px 0 10px;
+  background: linear-gradient(90deg, var(--grad-a), var(--grad-b));
+  border-radius: 999px;
+  opacity: 0.9;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.btn-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px 12px;
+  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(0, 0, 0, 0.1)
+  );
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease,
+    border-color 0.15s ease;
+}
+.btn-action i {
+  font-size: 14px;
+  opacity: 0.9;
+}
+.btn-action:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(0, 0, 0, 0.12)
+  );
+}
+.btn-action.danger {
+  border-color: rgba(255, 65, 65, 0.35);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 65, 65, 0.15),
+    rgba(0, 0, 0, 0.1)
+  );
+}
+
+.housing-home .right .pin-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px;
+}
+.pin-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.pin-display {
+  height: 38px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  letter-spacing: 6px;
+  font-size: 18px;
+  margin-bottom: 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.keypad-grid .key {
+  padding: 10px 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.06s ease, background 0.12s ease,
+    border-color 0.12s ease;
+}
+.keypad-grid .key:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.keypad-grid .key.subtle {
+  background: rgba(255, 255, 255, 0.03);
+  border-style: dashed;
+}
+
+.btn-confirm {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(41, 196, 90, 0.45);
+  color: var(--text);
+  background: linear-gradient(
+    180deg,
+    rgba(41, 196, 90, 0.2),
+    rgba(0, 0, 0, 0.1)
+  );
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-confirm:hover {
+  border-color: rgba(41, 196, 90, 0.75);
+  background: linear-gradient(
+    180deg,
+    rgba(41, 196, 90, 0.28),
+    rgba(0, 0, 0, 0.12)
+  );
+}
+/* === Top Status Icon Bar === */
+.status-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease,
+    border-color 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Lock: rot (locked) / grün (unlocked) */
+.icon-btn.lock.locked {
+  color: #ff5555;
+}
+.icon-btn.lock.unlocked {
+  color: #23d18b;
+}
+
+/* Bell: off = neutral weiß, on = weiß auf rotem Hintergrund */
+.icon-btn.bell.off {
+  color: #ffffffcc;
+}
+.icon-btn.bell.on {
+  color: #fff;
+  background: #c21f39;
+  border-color: #c21f39;
+}
+
+/* Keypad: grau (off) / weiß (on) */
+.icon-btn.keypad.off {
+  color: #9aa3ab;
+}
+.icon-btn.keypad.on {
+  color: #ffffff;
+}
+
+/* === 5. Button: Auf-/Zuschließen === */
+.btn-toggle-lock {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(0, 0, 0, 0.1)
+  );
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease,
+    border-color 0.15s ease;
+}
+.btn-toggle-lock:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(0, 0, 0, 0.12)
+  );
+}
+/* Statusbar als Display (nicht klickbar) */
+.status-bar.display {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.status-indicator {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* kein Cursor, kein Hover */
+}
+
+/* Lock: rot (locked) / grün (unlocked) */
+.status-indicator.lock.locked {
+  color: #ff5555;
+}
+.status-indicator.lock.unlocked {
+  color: #23d18b;
+}
+
+/* Bell: off = neutral weiß, on = weiß auf rotem Hintergrund */
+.status-indicator.bell.off {
+  color: #ffffffcc;
+}
+.status-indicator.bell.on {
+  color: #fff;
+  background: #c21f39;
+  border-color: #c21f39;
+}
+
+/* Keypad: grau (off) / weiß (on) */
+.status-indicator.keypad.off {
+  color: #9aa3ab;
+}
+.status-indicator.keypad.on {
+  color: #ffffff;
+}
+
+/* Großer Einzeln-Button unten: Betreten */
+.btn-enter {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(0, 0, 0, 0.1)
+  );
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease,
+    border-color 0.15s ease;
+}
+.btn-enter:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(0, 0, 0, 0.12)
+  );
+}
