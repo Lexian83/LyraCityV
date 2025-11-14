@@ -60,7 +60,9 @@ local function normalize_house(row)
   row.price              = toN(row.price, 0)
   row.rent               = toN(row.rent, 0)
   row.ipl                = toN(row.ipl)
-  row.lock_state         = (toN(row.lock_state, 0) == 1) and 1 or 0
+  -- 1 = abgeschlossen, 0 = offen
+row.lock_state         = asBool(row.lock_state) and 1 or 0
+
 
   row.hotel              = asBool(row.hotel)
   row.apartments         = toN(row.apartments, 0)
@@ -122,8 +124,10 @@ exports('getownerbyhouseid', function(houseId)
 end)
 exports('getlockstate', function(houseId)
   local row = MySQL.single.await('SELECT lock_state FROM houses WHERE id = ?', { tonumber(houseId) })
-  return row and tonumber(row.lock_state) or nil
+  if not row then return nil end
+  return asBool(row.lock_state) and 1 or 0
 end)
+
 exports('getrent', function(houseId)
   local row = MySQL.single.await('SELECT rent FROM houses WHERE id = ?', { tonumber(houseId) })
   return row and tonumber(row.rent) or nil

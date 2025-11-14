@@ -5,6 +5,7 @@ local currentHouse = {
     name        = nil,
     ownerStatus = nil,
     lockState   = 0,
+    secured     = 0,
 }
 
 local function openHousing(data)
@@ -12,6 +13,7 @@ local function openHousing(data)
     currentHouse.name        = data and data.houseName   or nil
     currentHouse.ownerStatus = data and data.ownerStatus or nil
     currentHouse.lockState   = data and tonumber(data.lockState) or 0
+    currentHouse.secured     = data and tonumber(data.secured)   or 0
 
     SendNUIMessage({
         action      = "openHousing",
@@ -19,6 +21,7 @@ local function openHousing(data)
         houseName   = currentHouse.name,
         ownerStatus = currentHouse.ownerStatus,
         lockState   = currentHouse.lockState,
+        secured     = currentHouse.secured,
     })
 
     CreateThread(function()

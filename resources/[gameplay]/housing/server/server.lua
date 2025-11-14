@@ -81,6 +81,8 @@ RegisterNetEvent('LCV:Housing:Server:Show', function(payload)
     local houseName   = nil
     local ownerStatus = nil
     local lockState   = 0
+    local secured     = 0
+
 
     if houseId then
         local hm = getHouseExports()
@@ -92,6 +94,8 @@ RegisterNetEvent('LCV:Housing:Server:Show', function(payload)
             if ok and row then
                 houseName   = row.name or ('Haus #' .. tostring(houseId))
                 ownerStatus = row.status  -- "frei" / "verkauft" / "vermietet"
+                lockState   = tonumber(row.lock_state) or 0
+                secured     = tonumber(row.secured) or 0
 
                 -- robustes Lock-State-Mapping (TinyInt, Bool, String)
                 local rawLock = row.lock_state
@@ -122,5 +126,6 @@ RegisterNetEvent('LCV:Housing:Server:Show', function(payload)
         houseName   = houseName,
         ownerStatus = ownerStatus,
         lockState   = lockState,
+        secured     = secured,
     })
 end)

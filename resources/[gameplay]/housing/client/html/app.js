@@ -13,6 +13,7 @@ const app = new Vue({
       houseName: "Lade Hausdaten.",
       ownerStatus: "",
       lockState: 0,
+      secured: 0,
     };
   },
   computed: {
@@ -86,6 +87,11 @@ const app = new Vue({
       } else {
         this.lockState = 0;
       }
+      if (payload.secured !== undefined && payload.secured !== null) {
+        this.secured = Number(payload.secured) || 0;
+      } else {
+        this.secured = 0;
+      }
 
       console.log(
         "[HOUSING][NUI] resolved houseName =",
@@ -93,7 +99,9 @@ const app = new Vue({
         "| ownerStatus =",
         this.ownerStatus,
         "| lockState =",
-        this.lockState
+        this.lockState,
+        "| secured =",
+        this.secured
       );
     },
   },

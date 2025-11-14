@@ -1,5 +1,5 @@
 Vue.component("tab-home", {
-  props: ["identity", "houseName", "ownerStatus", "lockState"],
+  props: ["identity", "houseName", "ownerStatus", "lockState", "secured"],
   data() {
     return {
       // reine Anzeige
@@ -32,13 +32,17 @@ Vue.component("tab-home", {
     isLocked() {
       return Number(this.lockState) === 1;
     },
+    // NEU: 1 = secured → Glocke rot
+    isSecured() {
+      return Number(this.secured) === 1;
+    },
   },
   methods: {
     actionRing() {
       console.log("[HOUSING] Klingeln gedrückt");
-      this.bellOn = true;
-      setTimeout(() => (this.bellOn = false), 400);
+      // später: Server-Event für "klingeln" etc.
     },
+
     actionEnter() {
       console.log("[HOUSING] Betreten gedrückt");
       // später: HouseManager-Enter-Logic
@@ -107,9 +111,10 @@ Vue.component("tab-home", {
           >
             <i class="fa-solid" :class="isLocked ? 'fa-lock' : 'fa-lock-open'"></i>
           </div>
-          <div class="status-indicator bell" :class="bellOn ? 'on' : 'off'">
-            <i class="fa-regular fa-bell"></i>
-          </div>
+            <div class="status-indicator bell" :class="isSecured ? 'on' : 'off'">
+    <i class="fa-regular fa-bell"></i>
+  </div>
+
           <div class="status-indicator keypad" :class="keypadOn ? 'on' : 'off'">
             <i class="fa-regular fa-keyboard"></i>
           </div>
