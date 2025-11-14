@@ -11,7 +11,8 @@ const app = new Vue({
       navOptions: ["Home"],
 
       houseName: "Lade Hausdaten.",
-      ownerStatus: "Lade Besitzerdaten...",
+      ownerStatus: "",
+      lockState: 0,
     };
   },
   computed: {
@@ -60,9 +61,10 @@ const app = new Vue({
     },
 
     applyHousingPayload(payload) {
-      // payload von Client: { houseId, houseName, ownerStatus }
+      console.log("[HOUSING][NUI] applyHousingPayload RAW =", payload);
       if (!payload) return;
 
+      // Name / Adresse
       if (payload.houseName && payload.houseName !== "") {
         this.houseName = payload.houseName;
       } else if (payload.houseId) {
@@ -71,14 +73,28 @@ const app = new Vue({
         this.houseName = "Unbekanntes Haus";
       }
 
-      if (
-        typeof payload.ownerStatus === "string" &&
-        payload.ownerStatus.trim() !== ""
-      ) {
+      // Besitzer-Status
+      if (typeof payload.ownerStatus === "string") {
         this.ownerStatus = payload.ownerStatus;
       } else {
-        this.ownerStatus = "Unbekannt";
+        this.ownerStatus = "";
       }
+
+      // Lock-State aus DB
+      if (payload.lockState !== undefined && payload.lockState !== null) {
+        this.lockState = Number(payload.lockState) || 0;
+      } else {
+        this.lockState = 0;
+      }
+
+      console.log(
+        "[HOUSING][NUI] resolved houseName =",
+        this.houseName,
+        "| ownerStatus =",
+        this.ownerStatus,
+        "| lockState =",
+        this.lockState
+      );
     },
   },
   mounted() {
@@ -86,10 +102,8 @@ const app = new Vue({
       const data = event.data || {};
 
       if (data.action === "openHousing") {
-        if (!this.show) {
-          this.applyHousingPayload(data);
-          this.show = true;
-        }
+        this.applyHousingPayload(data);
+        this.show = true;
         console.log("[HOUSING][NUI] openHousing", data);
       } else if (data.action === "closeHousing") {
         this.show = false;

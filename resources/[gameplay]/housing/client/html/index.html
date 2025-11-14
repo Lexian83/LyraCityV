@@ -20,8 +20,10 @@
           </div>
           <component
             v-bind:is="getTabComponent"
-            v-bind="{ identity, houseName, ownerStatus }"
+            v-bind="{ identity, houseName, ownerStatus, lockState }"
+            @update-lock="lockState = $event"
           ></component>
+
           <div class="bottombar">
             <div class="icons">
               <button

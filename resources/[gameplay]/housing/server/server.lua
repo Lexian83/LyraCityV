@@ -2,7 +2,6 @@
 
 local json = json
 
--- Hilfsfunktion, um House-Exports zu holen (houseManager / lcv-housemanager)
 local function getHouseExports()
     if GetResourceState('houseManager') == 'started' then
         return exports['houseManager']
@@ -13,7 +12,9 @@ local function getHouseExports()
 end
 
 local function safeEncodeDebug(v)
-    local ok, res = pcall(function() return json.encode(v) end)
+    local ok, res = pcall(function()
+        return json.encode(v)
+    end)
     if ok then return res end
     return '<encode failed>'
 end
@@ -25,10 +26,11 @@ local function parseHouseIdFromPayload(payload)
     if type(payload) == 'number' then
         return payload
     end
+
     if type(payload) == 'string' then
-        -- könnte entweder "20" oder '{"houseid":20}' sein
         local n = tonumber(payload)
         if n then return n end
+
         local ok, decoded = pcall(json.decode, payload)
         if ok and type(decoded) == 'table' then
             if decoded.houseid or decoded.houseId then
@@ -40,12 +42,10 @@ local function parseHouseIdFromPayload(payload)
 
     -- Table-Varianten
     if type(payload) == 'table' then
-        -- 1) direkt: payload.houseid / payload.houseId
         if payload.houseid or payload.houseId then
             return tonumber(payload.houseid or payload.houseId)
         end
 
-        -- 2) klassisch: payload.data = {...} oder payload.data = '{"houseid":20}'
         local raw = payload.data
         if raw ~= nil then
             if type(raw) == 'number' then
@@ -78,34 +78,35 @@ RegisterNetEvent('LCV:Housing:Server:Show', function(payload)
     local houseId = parseHouseIdFromPayload(payload)
     print('[HOUSING][SERVER] Parsed houseId = ' .. tostring(houseId))
 
-    local houseName  = nil
+    local houseName   = nil
     local ownerStatus = nil
+    local lockState   = 0
 
     if houseId then
         local hm = getHouseExports()
         if hm and hm.GetById then
             local ok, row = pcall(function()
-                return hm:GetById(houseId)   -- liefert normalisiertes Haus inkl. row.status
+                return hm:GetById(houseId)
             end)
 
             if ok and row then
-                houseName = row.name or ('Haus #' .. tostring(houseId))
+                houseName   = row.name or ('Haus #' .. tostring(houseId))
+                ownerStatus = row.status  -- "frei" / "verkauft" / "vermietet"
 
-                -- Status aus SSOT übernehmen: "frei" / "verkauft" / "vermietet"
-                -- falls aus irgendeinem Grund nicht gesetzt, leiten wir aus ownerid ab
-                local st = row.status
-                if not st or st == '' then
-                    local hasOwner = row.ownerid and row.ownerid > 0
-                    if not hasOwner then
-                        st = 'frei'
-                    else
-                        st = 'verkauft'
-                    end
+                -- robustes Lock-State-Mapping (TinyInt, Bool, String)
+                local rawLock = row.lock_state
+                if rawLock == nil then
+                    lockState = 0
+                elseif rawLock == true then
+                    lockState = 1
+                elseif rawLock == false then
+                    lockState = 0
+                else
+                    lockState = tonumber(rawLock) or 0
                 end
-                ownerStatus = st
 
-                print(('[HOUSING][SERVER] Loaded house #%d name="%s" status="%s"')
-                    :format(houseId, tostring(houseName), tostring(ownerStatus)))
+                print(('[HOUSING][SERVER] Loaded house #%d name="%s" status="%s" lock_state=%d')
+                    :format(houseId, tostring(houseName), tostring(ownerStatus), lockState))
             else
                 print('[HOUSING][SERVER] Fehler bei houseManager:GetById für id ' .. tostring(houseId))
             end
@@ -120,5 +121,6 @@ RegisterNetEvent('LCV:Housing:Server:Show', function(payload)
         houseId     = houseId,
         houseName   = houseName,
         ownerStatus = ownerStatus,
+        lockState   = lockState,
     })
 end)

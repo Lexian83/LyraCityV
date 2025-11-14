@@ -1,11 +1,10 @@
 Vue.component("tab-home", {
-  props: ["identity", "houseName", "ownerStatus"],
+  props: ["identity", "houseName", "ownerStatus", "lockState"],
   data() {
     return {
-      // reine Anzeige (oben)
-      locked: true, // 🔒 rot (abgeschlossen) / grün (aufgeschlossen)
-      bellOn: false, // 🔔 weiß (off) / rot (on)
-      keypadOn: false, // ⌨️ grau (off) / weiß (on)
+      // reine Anzeige
+      bellOn: false,
+      keypadOn: false,
 
       // Keypad
       codeInput: "",
@@ -17,6 +16,7 @@ Vue.component("tab-home", {
         ? this.houseName
         : "Unbekanntes Haus";
     },
+
     displayOwner() {
       if (!this.ownerStatus || this.ownerStatus === "") {
         return "Unbekannt";
@@ -27,13 +27,21 @@ Vue.component("tab-home", {
       if (v === "vermietet") return "Vermietet";
       return this.ownerStatus;
     },
+
+    // EINZIGE Logik: 1 = locked, 0 = unlocked
+    isLocked() {
+      return Number(this.lockState) === 1;
+    },
   },
   methods: {
     actionRing() {
       console.log("[HOUSING] Klingeln gedrückt");
+      this.bellOn = true;
+      setTimeout(() => (this.bellOn = false), 400);
     },
     actionEnter() {
       console.log("[HOUSING] Betreten gedrückt");
+      // später: HouseManager-Enter-Logic
     },
     actionMessage() {
       console.log("[HOUSING] Nachricht gedrückt");
@@ -41,13 +49,33 @@ Vue.component("tab-home", {
     actionBreakIn() {
       console.log("[HOUSING] Einbrechen gedrückt");
     },
+
     actionToggleLock() {
-      this.locked = !this.locked;
+      // aus aktueller Anzeige berechnen:
+      // 1 = locked, 0 = unlocked
+      const newState = this.isLocked ? 0 : 1;
+
       console.log(
-        "[HOUSING] Türstatus:",
-        this.locked ? "abgeschlossen" : "aufgeschlossen"
+        "[HOUSING] Türstatus-Button → neuer Zustand:",
+        newState === 1 ? "abgeschlossen (1)" : "aufgeschlossen (0)"
       );
+
+      // Parent (app.js) direkt updaten, damit UI SOFORT umspringt
+      this.$emit("update-lock", newState);
+
+      // an FiveM NUI → client.lua → houseManager
+      try {
+        fetch(`https://${GetParentResourceName()}/LCV:Housing:ToggleLock`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=UTF-8" },
+          body: JSON.stringify({ state: newState }),
+        });
+      } catch (e) {
+        console.error("[HOUSING] ToggleLock fetch error", e);
+      }
     },
+
+    // Keypad
     press(n) {
       if (this.codeInput.length < 8) this.codeInput += String(n);
     },
@@ -60,6 +88,7 @@ Vue.component("tab-home", {
     confirm() {
       console.log("[HOUSING] Code bestätigt:", this.codeInput);
     },
+
     setParameter(parameter, value) {
       this.identity[parameter] = value;
     },
@@ -70,10 +99,13 @@ Vue.component("tab-home", {
   template: `
     <div class="housing-home">
       <div class="left">
-        <!-- STATUS DISPLAY BAR (nicht klickbar) -->
+        <!-- STATUS DISPLAY BAR -->
         <div class="status-bar display">
-          <div class="status-indicator lock" :class="locked ? 'locked' : 'unlocked'">
-            <i class="fa-solid" :class="locked ? 'fa-lock' : 'fa-lock-open'"></i>
+          <div
+            class="status-indicator lock"
+            :class="isLocked ? 'locked' : 'unlocked'"
+          >
+            <i class="fa-solid" :class="isLocked ? 'fa-lock' : 'fa-lock-open'"></i>
           </div>
           <div class="status-indicator bell" :class="bellOn ? 'on' : 'off'">
             <i class="fa-regular fa-bell"></i>
@@ -83,6 +115,7 @@ Vue.component("tab-home", {
           </div>
         </div>
 
+        <!-- Info-Karten -->
         <div class="card">
           <div class="title">Adresse</div>
           <div class="value">{{ displayAddress }}</div>
@@ -94,14 +127,15 @@ Vue.component("tab-home", {
 
         <div class="divider"></div>
 
+        <!-- 4er-Button-Block -->
         <div class="actions-grid">
           <button class="btn-action" @click="actionRing">
             <i class="fa-regular fa-bell"></i>
             <span>Klingeln</span>
           </button>
           <button class="btn-action" @click="actionToggleLock">
-            <i class="fa-solid fa-lock"></i>
-            <span>Auf-/Zusperren</span>
+            <i class="fa-solid" :class="isLocked ? 'fa-lock-open' : 'fa-lock'"></i>
+            <span>{{ isLocked ? 'Aufschließen' : 'Abschließen' }}</span>
           </button>
           <button class="btn-action" @click="actionMessage">
             <i class="fa-regular fa-envelope"></i>
@@ -112,22 +146,39 @@ Vue.component("tab-home", {
             <span>Einbrechen</span>
           </button>
         </div>
+
+        <!-- Betreten extra darunter -->
+        <div style="margin-top:8px;">
+          <button class="btn-enter" @click="actionEnter">
+            <i class="fa-solid fa-door-open"></i>
+            <span>Betreten</span>
+          </button>
+        </div>
       </div>
 
-      <!-- Rechts: Keypad, Dummy-Inhalt etc. -->
       <div class="right">
-        <div class="card">
-          <div class="title">PIN-Code</div>
-          <div class="keypad-display">{{ codeInput || '••••' }}</div>
-          <div class="keypad-grid">
-            <button v-for="n in 9" :key="n" @click="press(n)">{{ n }}</button>
-            <button @click="clearAll">C</button>
-            <button @click="press(0)">0</button>
-            <button @click="backspace">&larr;</button>
+        <div class="pin-box">
+          <div class="pin-label">Codeeingabe</div>
+          <div class="pin-display">
+            {{ codeInput ? codeInput.replace(/./g, "•") : "••••" }}
           </div>
-          <button class="btn-action" style="margin-top: 6px;" @click="confirm">
+          <div class="keypad-grid">
+            <button class="key" @click="press(1)">1</button>
+            <button class="key" @click="press(2)">2</button>
+            <button class="key" @click="press(3)">3</button>
+            <button class="key" @click="press(4)">4</button>
+            <button class="key" @click="press(5)">5</button>
+            <button class="key" @click="press(6)">6</button>
+            <button class="key" @click="press(7)">7</button>
+            <button class="key" @click="press(8)">8</button>
+            <button class="key" @click="press(9)">9</button>
+            <button class="key subtle" @click="clearAll">CLR</button>
+            <button class="key" @click="press(0)">0</button>
+            <button class="key subtle" @click="backspace">DEL</button>
+          </div>
+          <button class="btn-confirm" @click="confirm">
             <i class="fa-solid fa-check"></i>
-            <span>Bestätigen</span>
+            <span>Code bestätigen</span>
           </button>
         </div>
       </div>
