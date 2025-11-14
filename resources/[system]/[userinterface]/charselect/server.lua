@@ -23,7 +23,7 @@ local function fmtBirthdate(val, mode)
         or  (('%02d.%02d.%04d'):format(d, m, y))
     end
   end
-  return ''
+  return tostring(val)
 end
 
 local function slog(level, msg)
@@ -45,27 +45,39 @@ local function PM()
   return nil
 end
 
--- Prüft, ob Account noch "neu" ist (accounts.new = 1)
+local function AM()
+  -- Account-Manager Wrapper (für accounts.* Logik)
+  if GetResourceState('accountManager') == 'started' then
+    return exports['accountManager']
+  end
+  if GetResourceState('lcv-accountmanager') == 'started' then
+    return exports['lcv-accountmanager']
+  end
+  return nil
+end
+
+-- Prüft, ob Account noch "neu" ist (accounts.new = 1) – rein über AccountManager-Export
 local function isAccountNew(accountId)
   accountId = tonumber(accountId)
   if not accountId then return false end
-  if not MySQL then
-    slog("error", "MySQL ist nil, kann accounts.new nicht prüfen")
+
+  local am = AM()
+  if not am or not am.IsAccountNew then
+    -- Wenn der AccountManager (noch) nicht läuft, verhalten wir uns einfach wie "nicht neu"
+    slog("debug", "AccountManager-Export IsAccountNew nicht verfügbar, fallback=isNew=false")
     return false
   end
 
-  local row = MySQL.single.await("SELECT new FROM accounts WHERE id = ?", { accountId })
-  if not row or row.new == nil then
+  local ok, result = pcall(function()
+    return am:IsAccountNew(accountId)
+  end)
+
+  if not ok then
+    slog("error", ("IsAccountNew-Aufruf im AccountManager fehlgeschlagen: %s"):format(tostring(result)))
     return false
   end
 
-  local v = row.new
-  if type(v) == "boolean" then
-    return v
-  end
-
-  local n = tonumber(v) or 0
-  return n == 1
+  return result and true or false
 end
 
 -- Lädt alle Charaktere eines Accounts über playerManager-Export
@@ -132,7 +144,7 @@ local function buildPayload(src, rawAccountId, cb)
     return cb({ canCreate = false, maxCharacters = MAX_CHARACTERS, characters = {} }, nil)
   end
 
-  -- 👉 Hier holen wir accounts.new
+  -- 👉 Hier holen wir accounts.new über den AccountManager
   local isNew = isAccountNew(accountId)
 
   loadCharactersForAccount(accountId, function(payload)
@@ -154,6 +166,7 @@ end
 AddEventHandler("LCV:charselect:load", function(targetSrc, accountId)
   local eventSource = source
   local src = tonumber(eventSource) or 0
+
   if src == 0 and targetSrc ~= nil then
     local t = tonumber(targetSrc)
     if t and t > 0 then src = t end

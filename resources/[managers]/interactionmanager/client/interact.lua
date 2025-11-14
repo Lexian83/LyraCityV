@@ -132,12 +132,26 @@ RegisterNetEvent('LCV:world:interact', function()
    lib.notify({ description = "Dies ist ein SODA AUTOMAT", type = "info" })
     return
 
-      -- Housing Trigger
-    elseif etype == 'house' then
-      TriggerEvent('LCV:Housing:Client:Show',target)
-      print(('HAUS DATEN: DATA: %s'):format(target.data))
-      lib.notify({ description = "Dies ist ein HAUSTRIGGER", type = "info" })
+  -- Housing Trigger
+  elseif etype == 'house' then
+    -- target = STATIC_POINT aus DB:
+    -- { id, name, description, type='house', coords=vector3, radius, data={ houseid=... } }
+    local houseId = nil
+    if type(target.data) == "table" then
+      houseId = target.data.houseid or target.data.houseId or nil
+    end
+
+    -- Schickt die Info an den Housing-Server, der holt sich Name & Details aus dem houseManager
+    TriggerServerEvent('LCV:Housing:Server:Show', target.data or { houseid = houseId })
+
+    print(('[INTERACT] HOUSE Trigger hit: pointId=%s houseId=%s'):format(
+      tostring(target.id),
+      tostring(houseId or 'n/a')
+    ))
+
+    lib.notify({ description = "Dies ist ein HAUSTRIGGER", type = "info" })
     return
+
 
   -- NPC
   elseif etype == 'npc' then

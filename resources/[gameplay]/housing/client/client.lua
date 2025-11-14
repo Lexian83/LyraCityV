@@ -9,6 +9,11 @@ local function openHousing(data)
     currentHouse.id   = data and data.houseId   or nil
     currentHouse.name = data and data.houseName or nil
 
+    print(('[HOUSING][CLIENT] openHousing: houseId=%s houseName=%s'):format(
+        tostring(currentHouse.id),
+        tostring(currentHouse.name)
+    ))
+
     SendNUIMessage({
         action    = "openHousing",
         houseId   = currentHouse.id,
@@ -22,7 +27,7 @@ local function openHousing(data)
     end)
 
     exports.inputmanager:LCV_OpenUI('Housing', { nui = true, keepInput = false })
-    print("[HOUSING][CLIENT] Open UI (houseId="..tostring(currentHouse.id)..")")
+    print("[HOUSING][CLIENT] Open UI (houseId=" .. tostring(currentHouse.id) .. ")")
 end
 
 local function closeHousing()

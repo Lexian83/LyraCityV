@@ -15,7 +15,9 @@ server_scripts {
 server_exports {
     'EnsureAccountByDiscord',
     'GetAccountByDiscord',
-    'UpdateLastLogin'
+    'UpdateLastLogin',
+    'IsAccountNew',       -- 👈 neu
+    'GetAccountById'      -- optional
 }
 
 dependencies {

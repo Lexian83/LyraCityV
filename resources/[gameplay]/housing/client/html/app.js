@@ -58,28 +58,112 @@ const app = new Vue({
       }, 800);
     },
 
-    applyHousingPayload(payload) {
-      // payload von Client: { houseId, houseName }
-      if (!payload) return;
-      if (payload.houseName && payload.houseName !== "") {
-        this.houseName = payload.houseName;
-      } else if (payload.houseId) {
-        this.houseName = `Haus #${payload.houseId}`;
+    // 🔍 Kleine Hilfsfunktion: irgend einen Key tief im Objekt finden
+    deepFindKey(obj, keyNames) {
+      if (!obj || typeof obj !== "object") return undefined;
+
+      // falls Array → alle Elemente durchsuchen
+      if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+          const res = this.deepFindKey(obj[i], keyNames);
+          if (res !== undefined) return res;
+        }
+        return undefined;
+      }
+
+      const keys = Object.keys(obj);
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        const v = obj[k];
+
+        // direkter Treffer?
+        if (keyNames.includes(k)) {
+          if (typeof v === "string" || typeof v === "number") return v;
+        }
+
+        // rekursiv in verschachtelten Objekten weiter suchen
+        if (v && typeof v === "object") {
+          const res = this.deepFindKey(v, keyNames);
+          if (res !== undefined) return res;
+        }
+      }
+
+      return undefined;
+    },
+
+    applyHousingPayload(rawPayload) {
+      if (!rawPayload) return;
+
+      // Debug: einmal halbwegs lesbar ausgeben
+      try {
+        console.log(
+          "[HOUSING][NUI] applyHousingPayload RAW = " +
+            JSON.stringify(rawPayload)
+        );
+      } catch (e) {
+        console.log(
+          "[HOUSING][NUI] applyHousingPayload RAW (fallback)",
+          rawPayload
+        );
+      }
+
+      // 1. Direkt versuchen: data.houseName / data.houseId
+      let directName = rawPayload.houseName;
+      let directId = rawPayload.houseId;
+
+      // 2. Wenn es ein verschachteltes payload gibt → bevorzugen
+      const inner =
+        rawPayload.payload && typeof rawPayload.payload === "object"
+          ? rawPayload.payload
+          : rawPayload;
+
+      if (inner && typeof inner === "object") {
+        if (!directName && inner.houseName) directName = inner.houseName;
+        if (!directId && inner.houseId) directId = inner.houseId;
+      }
+
+      // 3. Wenn wir immer noch nix haben → deep search
+      let deepName = this.deepFindKey(rawPayload, [
+        "houseName",
+        "address",
+        "name",
+        "street",
+      ]);
+      let deepId = this.deepFindKey(rawPayload, ["houseId", "id", "houseid"]);
+
+      let finalName = directName || deepName;
+      let finalId = directId || deepId;
+
+      if (finalName && finalName !== "") {
+        this.houseName = String(finalName);
+      } else if (finalId) {
+        this.houseName = "Haus #" + String(finalId);
       } else {
         this.houseName = "Unbekanntes Haus";
       }
+
+      console.log(
+        "[HOUSING][NUI] resolved houseName = " +
+          this.houseName +
+          " (id=" +
+          String(finalId || "n/a") +
+          ")"
+      );
     },
   },
   mounted() {
     window.addEventListener("message", (event) => {
       const data = event.data || {};
 
+      try {
+        console.log("[HOUSING][NUI] window.message = " + JSON.stringify(data));
+      } catch (e) {
+        console.log("[HOUSING][NUI] window.message (fallback)", data);
+      }
+
       if (data.action === "openHousing") {
-        if (!this.show) {
-          this.applyHousingPayload(data);
-          this.show = true;
-        }
-        console.log("[HOUSING][NUI] openHousing", data);
+        this.applyHousingPayload(data);
+        this.show = true;
       } else if (data.action === "closeHousing") {
         this.show = false;
         console.log("[HOUSING][NUI] closeHousing");
