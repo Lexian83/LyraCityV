@@ -95,9 +95,9 @@
 
 ## ✅ To-Do Liste
 
-- [ ] Datenbank anlegen
-- [ ] Discord-Login implementieren
-- [ ] Charakter-Auswahlmenü
+- [x] Datenbank anlegen
+- [x] Discord-Login implementieren
+- [x] Charakter-Auswahlmenü
 - [ ] Inventarsystem (DB + UI)
 - [ ] Housing & Garage (Owner-System)
 - [ ] Fraktionssystem (Ranks + Permissions)
