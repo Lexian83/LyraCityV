@@ -12,8 +12,11 @@ const app = new Vue({
 
       houseName: "Lade Hausdaten.",
       ownerStatus: "",
+      ownerName: "", // 👈
       lockState: 0,
       secured: 0,
+      pincode: 0,
+      isOwner: false,
     };
   },
   computed: {
@@ -65,7 +68,6 @@ const app = new Vue({
       console.log("[HOUSING][NUI] applyHousingPayload RAW =", payload);
       if (!payload) return;
 
-      // Name / Adresse
       if (payload.houseName && payload.houseName !== "") {
         this.houseName = payload.houseName;
       } else if (payload.houseId) {
@@ -74,34 +76,53 @@ const app = new Vue({
         this.houseName = "Unbekanntes Haus";
       }
 
-      // Besitzer-Status
       if (typeof payload.ownerStatus === "string") {
         this.ownerStatus = payload.ownerStatus;
       } else {
         this.ownerStatus = "";
       }
 
-      // Lock-State aus DB
+      if (typeof payload.ownerName === "string" && payload.ownerName !== "") {
+        this.ownerName = payload.ownerName;
+      } else {
+        this.ownerName = "";
+      }
+
       if (payload.lockState !== undefined && payload.lockState !== null) {
         this.lockState = Number(payload.lockState) || 0;
       } else {
         this.lockState = 0;
       }
+
       if (payload.secured !== undefined && payload.secured !== null) {
         this.secured = Number(payload.secured) || 0;
       } else {
         this.secured = 0;
       }
 
+      if (payload.pincode !== undefined && payload.pincode !== null) {
+        this.pincode = Number(payload.pincode) || 0;
+      } else {
+        this.pincode = 0;
+      }
+
+      this.isOwner = !!payload.isOwner;
+
       console.log(
         "[HOUSING][NUI] resolved houseName =",
         this.houseName,
         "| ownerStatus =",
         this.ownerStatus,
+        "| ownerName =",
+        this.ownerName,
         "| lockState =",
         this.lockState,
         "| secured =",
-        this.secured
+        this.secured,
+        "| pincode =",
+        this.pincode,
+        "| isOwner =",
+        this.isOwner
       );
     },
   },

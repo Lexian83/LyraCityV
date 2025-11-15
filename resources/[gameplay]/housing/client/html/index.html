@@ -20,7 +20,7 @@
           </div>
           <component
             v-bind:is="getTabComponent"
-            v-bind="{ identity, houseName, ownerStatus, lockState,secured }"
+            v-bind="{ identity, houseName, ownerStatus, ownerName, lockState, secured, pincode, isOwner }"
             @update-lock="lockState = $event"
           ></component>
 

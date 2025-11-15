@@ -1,12 +1,18 @@
 Vue.component("tab-home", {
-  props: ["identity", "houseName", "ownerStatus", "lockState", "secured"],
+  props: [
+    "identity",
+    "houseName",
+    "ownerStatus",
+    "ownerName", // 👈
+    "lockState",
+    "secured",
+    "pincode",
+    "isOwner",
+  ],
   data() {
     return {
-      // reine Anzeige
       bellOn: false,
       keypadOn: false,
-
-      // Keypad
       codeInput: "",
     };
   },
@@ -18,6 +24,12 @@ Vue.component("tab-home", {
     },
 
     displayOwner() {
+      // 1. Priorität: konkreter Besitzername
+      if (this.ownerName && this.ownerName !== "") {
+        return this.ownerName;
+      }
+
+      // 2. Fallback: Status-Text
       if (!this.ownerStatus || this.ownerStatus === "") {
         return "Unbekannt";
       }
@@ -28,21 +40,26 @@ Vue.component("tab-home", {
       return this.ownerStatus;
     },
 
-    // EINZIGE Logik: 1 = locked, 0 = unlocked
+    // 1 = locked, 0 = unlocked
     isLocked() {
       return Number(this.lockState) === 1;
     },
-    // NEU: 1 = secured → Glocke rot
+
+    // 1 = secured → Glocke rot
     isSecured() {
       return Number(this.secured) === 1;
+    },
+
+    // pincode > 0 → Keyboard weiß
+    isPincodeSet() {
+      return Number(this.pincode) > 0;
     },
   },
   methods: {
     actionRing() {
       console.log("[HOUSING] Klingeln gedrückt");
-      // später: Server-Event für "klingeln" etc.
+      // später: Server-Event
     },
-
     actionEnter() {
       console.log("[HOUSING] Betreten gedrückt");
       // später: HouseManager-Enter-Logic
@@ -55,8 +72,6 @@ Vue.component("tab-home", {
     },
 
     actionToggleLock() {
-      // aus aktueller Anzeige berechnen:
-      // 1 = locked, 0 = unlocked
       const newState = this.isLocked ? 0 : 1;
 
       console.log(
@@ -64,10 +79,8 @@ Vue.component("tab-home", {
         newState === 1 ? "abgeschlossen (1)" : "aufgeschlossen (0)"
       );
 
-      // Parent (app.js) direkt updaten, damit UI SOFORT umspringt
       this.$emit("update-lock", newState);
 
-      // an FiveM NUI → client.lua → houseManager
       try {
         fetch(`https://${GetParentResourceName()}/LCV:Housing:ToggleLock`, {
           method: "POST",
@@ -79,7 +92,6 @@ Vue.component("tab-home", {
       }
     },
 
-    // Keypad
     press(n) {
       if (this.codeInput.length < 8) this.codeInput += String(n);
     },
@@ -103,19 +115,18 @@ Vue.component("tab-home", {
   template: `
     <div class="housing-home">
       <div class="left">
-        <!-- STATUS DISPLAY BAR -->
-        <div class="status-bar display">
+        <!-- STATUS DISPLAY BAR: nur sichtbar wenn isOwner -->
+        <div class="status-bar display" v-if="isOwner">
           <div
             class="status-indicator lock"
             :class="isLocked ? 'locked' : 'unlocked'"
           >
             <i class="fa-solid" :class="isLocked ? 'fa-lock' : 'fa-lock-open'"></i>
           </div>
-            <div class="status-indicator bell" :class="isSecured ? 'on' : 'off'">
-    <i class="fa-regular fa-bell"></i>
-  </div>
-
-          <div class="status-indicator keypad" :class="keypadOn ? 'on' : 'off'">
+          <div class="status-indicator bell" :class="isSecured ? 'on' : 'off'">
+            <i class="fa-regular fa-bell"></i>
+          </div>
+          <div class="status-indicator keypad" :class="isPincodeSet ? 'on' : 'off'">
             <i class="fa-regular fa-keyboard"></i>
           </div>
         </div>
@@ -138,7 +149,7 @@ Vue.component("tab-home", {
             <i class="fa-regular fa-bell"></i>
             <span>Klingeln</span>
           </button>
-          <button class="btn-action" @click="actionToggleLock">
+          <button class="btn-action" @click="actionToggleLock" v-if="isOwner">
             <i class="fa-solid" :class="isLocked ? 'fa-lock-open' : 'fa-lock'"></i>
             <span>{{ isLocked ? 'Aufschließen' : 'Abschließen' }}</span>
           </button>

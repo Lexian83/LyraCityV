@@ -33,8 +33,12 @@ server_exports {
     -- Admin-CRUD für Characters
     'ListCharacters',
     'UpdateCharacterFlags',
-    'DeleteCharacterById'
+    'DeleteCharacterById',
+
+    -- 👇 NEU
+    'GetCharacterName',
 }
+
 
 
 dependency 'SQL'

@@ -17,6 +17,15 @@ end
 if not MySQL then
     log('ERROR', 'MySQL ist nil. Stelle sicher, dass @oxmysql vor diesem Script geladen wird!')
 end
+local function db_getCharacterNameById(charId)
+    -- direkt sicher in Zahl wandeln, ohne toN (liegt weiter unten)
+    charId = tonumber(charId)
+    if not charId then return nil end
+
+    local row = MySQL.single.await('SELECT name FROM characters WHERE id = ?', { charId })
+    return row and row.name or nil
+end
+
 
 local function safeName(src) return GetPlayerName(src) or ('src:' .. tostring(src)) end
 local function toN(v, d) local n = tonumber(v); return n ~= nil and n or d end
@@ -653,3 +662,7 @@ local function listCharactersByAccount(accountId)
   return { ok = true, characters = rows }
 end
 exports('ListCharactersByAccount', listCharactersByAccount)
+
+exports('GetCharacterName', function(charId)
+    return db_getCharacterNameById(charId)
+end)
